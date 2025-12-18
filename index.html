@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JW Multiple Player Pro - 아카이브 동기화 에디션</title>
+    <title>JW Multiple Player Pro - 아카이브 통합 에디션</title>
     <!-- React 및 필수 라이브러리 CDN -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -18,7 +18,7 @@
         
         mark { color: inherit; border-radius: 2px; }
 
-        /* 슬라이더 스타일 */
+        /* 슬라이더 스타일 - 텍스트보다 튀지 않도록 작게 조정 */
         input[type=range] { -webkit-appearance: none; background: transparent; }
         input[type=range]:focus { outline: none; }
         input[type=range]::-webkit-slider-thumb {
@@ -35,7 +35,7 @@
             width: 100%;
             height: 3px;
             cursor: pointer;
-            background: rgba(30, 111, 84, 0.15);
+            background: rgba(30, 111, 84, 0.2);
             border-radius: 2px;
         }
 
@@ -67,11 +67,15 @@
             text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 2px 4px rgba(0,0,0,0.8);
         }
 
-        /* 텍스트 굵기 제거 */
+        /* 가독성을 위해 모든 본문 텍스트에서 굵기(Bold) 제거 */
         p, span, div, button { font-weight: normal !important; }
-        .font-black, .font-bold { font-weight: normal !important; }
-        /* 명시적 강조가 필요한 헤더만 제외 */
-        nav h1, h3 { font-weight: 800 !important; }
+        /* 명시적 강조가 필요한 주요 제목들만 예외 처리 */
+        nav h1, h3, .brand-logo { font-weight: 800 !important; }
+        
+        /* 모바일 대응 */
+        @media (max-width: 640px) {
+            .control-box-text { font-size: 9px !important; }
+        }
     </style>
 </head>
 <body class="bg-white text-slate-900">
@@ -80,8 +84,8 @@
     <script type="text/babel">
         const { useState, useRef, useEffect, useMemo } = React;
 
-        const apiKey = ""; // Gemini API Key 자동 주입
-        // GitHub 데이터 인덱스 메인 주소
+        const apiKey = ""; // Gemini API Key
+        // GitHub 데이터 아카이브 인덱스 주소 (고정)
         const DEFAULT_ARCHIVE_URL = "https://raw.githubusercontent.com/MultipePlayer/whateveryouwant/refs/heads/main/data/jw_data_index.json";
 
         const Icon = ({ name, size = 14, className = "" }) => {
@@ -97,7 +101,9 @@
                 help: <><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></>,
                 globe: <><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></>,
                 alert: <><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></>,
-                sync: <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" />
+                sync: <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" />,
+                type: <><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="12" y1="4" x2="12" y2="20"></line><line x1="9" y1="20" x2="15" y2="20"></line></>,
+                external: <><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></>
             };
             return (
                 <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -115,8 +121,8 @@
             const [playbackRate, setPlaybackRate] = useState(1.0); 
             const [isClipping, setIsClipping] = useState(false);
             const [showHelp, setShowHelp] = useState(false);
-            const [dataLibrary, setDataLibrary] = useState({}); // 통합 라이브러리 DB
-            const [syncStatus, setSyncStatus] = useState("idle"); // idle, syncing, ready, error
+            const [dataLibrary, setDataLibrary] = useState({}); 
+            const [syncStatus, setSyncStatus] = useState("idle"); 
 
             const [activeIdxKo, setActiveIdxKo] = useState(-1);
             const [activeIdxEn, setActiveIdxEn] = useState(-1);
@@ -151,7 +157,7 @@
 
             const [tracks, setTracks] = useState({ ko: [], zh: [], en: [] });
 
-            // --- 아카이브 동기화 엔진 ---
+            // --- 아카이브 자동 동기화 로직 ---
             useEffect(() => {
                 const syncArchive = async () => {
                     setSyncStatus("syncing");
@@ -160,11 +166,11 @@
                         if (!indexRes.ok) throw new Error("Index load failed");
                         const indexData = await indexRes.json();
                         
-                        // 조각 모으기 (_1.json, _2.json...)
                         const baseUrl = DEFAULT_ARCHIVE_URL.substring(0, DEFAULT_ARCHIVE_URL.lastIndexOf('/'));
                         let mergedLibrary = {};
                         
-                        for (let i = 1; i <= indexData.chunkCount; i++) {
+                        // 지도(indexData)에 명시된 chunkCount만큼 조각들 가져오기
+                        for (let i = 1; i <= (indexData.chunkCount || 1); i++) {
                             const chunkRes = await fetch(`${baseUrl}/jw_data_${i}.json`);
                             if (chunkRes.ok) {
                                 const chunkData = await chunkRes.json();
@@ -182,7 +188,7 @@
                 syncArchive();
             }, []);
 
-            // 미디어 코드 추출 (해시 링크 대응 강화)
+            // 미디어 코드 추출 로직 (Hash 링크 포함)
             const extractMediaCode = (url) => {
                 if (!url) return null;
                 // 1. 해시 뒤 아이템 코드 추출 (#ko/mediaitems/.../CODE)
@@ -195,7 +201,7 @@
                 // 2. Query Parameter 추출 (item=CODE)
                 const searchParams = new URLSearchParams(url.split('?')[1]);
                 if (searchParams.has('item')) return searchParams.get('item');
-                // 3. 일반 URL 경로 추출
+                // 3. 일반 경로 추출
                 const pathMatch = url.match(/\/([^/]+)_VIDEO/);
                 if (pathMatch) return pathMatch[1];
 
@@ -208,7 +214,7 @@
 
                 const mediaCode = extractMediaCode(inputUrl);
                 
-                // 1. 동기화된 라이브러리에서 먼저 찾기
+                // 1. 동기화된 라이브러리(아카이브)에서 먼저 검색
                 if (mediaCode && dataLibrary[mediaCode]) {
                     const data = dataLibrary[mediaCode];
                     setVideoUrl(data.videoUrl);
@@ -217,9 +223,9 @@
                     return;
                 }
 
-                // 2. 라이브러리에 없는 경우 AI 분석
+                // 2. 라이브러리에 없을 경우 Gemini AI 분석Fallback
                 try {
-                    const prompt = `Analyze URL: "${inputUrl}". Find direct MP4 and extract ko, zh (with pinyin), en transcripts. Return valid JSON only: { "videoUrl": "string", "tracks": { "ko": [], "zh": [], "en": [] } }. Precise timestamps (float seconds) are required.`;
+                    const prompt = `Analyze URL: "${inputUrl}". Extract media code. Find direct MP4 link and transcripts for ko, zh (with pinyin), en. Return strictly JSON: { "videoUrl": "string", "tracks": { "ko": [], "zh": [], "en": [] } }. Precise float timestamps required.`;
                     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -231,9 +237,9 @@
                         setVideoUrl(data.videoUrl);
                         if (data.tracks) setTracks(data.tracks);
                     } else {
-                        alert("라이브러리에 데이터가 없으며 실시간 분석에도 실패했습니다. 링크를 확인해 주세요.");
+                        alert("라이브러리에 데이터가 없으며 실시간 분석에도 실패했습니다.");
                     }
-                } catch (err) { alert("분석 오류가 발생했습니다."); } finally { setIsClipping(false); }
+                } catch (err) { alert("분석 중 오류 발생."); } finally { setIsClipping(false); }
             };
 
             const togglePlay = () => {
@@ -259,7 +265,7 @@
                 else { videoRef.current.pause(); setIsPlaying(false); }
             };
 
-            // 스크롤 보정 (잘림 방지 및 박스 상단 넉넉한 위치 확보)
+            // 스크롤 위치 보정 (윗부분 안 잘리게)
             useEffect(() => {
                 const leadIdx = anchorLang === 'ko' ? activeIdxKo : anchorLang === 'zh' ? activeIdxZh : activeIdxEn;
                 if (leadIdx !== -1 && scrollRef.current && searchTerm === "") {
@@ -332,13 +338,16 @@
             const setAllVideoFontSize = (size) => { setFontSizeKo(size); setFontSizeZh(size); setFontSizeEn(size); };
             const setAllScriptSize = (size) => { setScriptSizeKo(size); setScriptSizeZh(size); setScriptSizeEn(size); };
 
+            const buttonAccent = "bg-[#1E6F54] hover:bg-[#154d3a]";
+            const accentText = "text-[#1E6F54]";
+
             return (
                 <div className="min-h-screen font-sans flex flex-col relative overflow-hidden bg-white text-slate-900">
                     
                     {/* 네비게이션 바 */}
                     <nav className="h-[45px] border-b px-4 lg:px-6 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-50">
                         <div className="flex items-center gap-3">
-                            <div className="bg-[#1E6F54] w-6 h-6 rounded-lg flex items-center justify-center text-white text-[10px] shadow-sm">MP</div>
+                            <div className="bg-[#1E6F54] w-6 h-6 rounded-lg flex items-center justify-center font-black text-white text-[10px] shadow-sm brand-logo">MP</div>
                             <h1 className="text-[11px] lg:text-[12px] text-[#1E6F54] tracking-tight hidden sm:block uppercase">JW Player Pro</h1>
                         </div>
                         
@@ -399,7 +408,7 @@
                             </div>
 
                             {/* 컨트롤 및 설정 박스 */}
-                            <div className="p-4 lg:p-5 rounded-[1.5rem] border-2 border-slate-200 bg-white flex flex-col gap-4">
+                            <div className="p-4 lg:p-5 rounded-[1.5rem] border-2 border-slate-200 bg-white flex flex-col gap-4 shadow-sm">
                                 <div className="flex items-center gap-4 text-[10px]">
                                     <button onClick={togglePlay} className="bg-[#1E6F54] w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-md active:scale-95 transition-all shrink-0">
                                         <Icon name={isPlaying ? "pause" : "play"} size={16} />
@@ -429,7 +438,7 @@
                                             </div>
                                         </div>
                                         <div className="space-y-1.5">
-                                            <label className="text-slate-500 uppercase flex items-center gap-1.5"><Icon name="mouse" size={12}/> 클릭 동작</label>
+                                            <label className="text-slate-500 uppercase flex items-center gap-1.5"><Icon name="mouse" size={12}/> 스크립트 클릭 시 동작</label>
                                             <div className="flex p-0.5 rounded-lg border border-slate-200 bg-slate-50">
                                                 <button onClick={() => setClickBehavior('play')} className={`flex-1 py-1 rounded-md transition-all ${clickBehavior === 'play' ? 'bg-[#1E6F54] text-white' : 'text-slate-500'}`}>바로 재생</button>
                                                 <button onClick={() => setClickBehavior('pause')} className={`flex-1 py-1 rounded-md transition-all ${clickBehavior === 'pause' ? 'bg-[#1E6F54] text-white' : 'text-slate-500'}`}>정지 이동</button>
@@ -442,7 +451,7 @@
                                             <div className="flex justify-between text-slate-500 uppercase">배속 설정 <span className="text-emerald-700">{playbackRate}x</span></div>
                                             <div className="flex p-0.5 rounded-lg border border-slate-200 bg-slate-50">
                                                 {[0.8, 1.0, 1.2, 1.5].map(rate => (
-                                                    <button key={rate} onClick={() => handleRateChange(rate)} className={`flex-1 py-1 rounded-md transition-all ${playbackRate === rate ? 'bg-[#1E6F54] text-white shadow-sm' : 'text-slate-500'}`}>{rate}x</button>
+                                                    <button key={rate} onClick={() => handleRateChange(rate)} className={`flex-1 py-1 rounded-md transition-all ${playbackRate === rate ? 'bg-[#1E6F54] text-white shadow-sm' : 'text-slate-500 hover:text-emerald-700'}`}>{rate}x</button>
                                                 ))}
                                             </div>
                                         </div>
@@ -451,7 +460,7 @@
                                             <div className="grid grid-cols-3 gap-1 p-0.5 rounded-lg border border-slate-200 bg-slate-50 h-[32px]">
                                                 <button onClick={() => setLoopA(currentTime)} className={`rounded-md border transition-all ${loopA !== null ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-white text-slate-500 border-slate-200'}`}>A</button>
                                                 <button onClick={() => setLoopB(currentTime)} className={`rounded-md border transition-all ${loopB !== null ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-white text-slate-500 border-slate-200'}`}>B</button>
-                                                <button onClick={() => setIsLooping(!isLooping)} disabled={loopA === null || loopB === null} className={`rounded-md transition-all border flex items-center justify-center ${isLooping ? 'bg-emerald-700 text-white border-emerald-800' : 'bg-white text-slate-400 border-slate-200 opacity-50'}`}>
+                                                <button onClick={() => setIsLooping(!isLooping)} disabled={loopA === null || loopB === null} className={`rounded-md transition-all border flex items-center justify-center ${isLooping ? 'bg-emerald-700 text-white border-emerald-800 shadow-sm' : 'bg-white text-slate-400 border-slate-200 opacity-50'}`}>
                                                   {isLooping ? 'ON' : 'OFF'}
                                                 </button>
                                             </div>
@@ -462,9 +471,9 @@
                                 <div className="border-t border-slate-100 pt-3 text-[10px]">
                                     <div className="flex items-center justify-between mb-3 px-1">
                                         <button onClick={() => setShowVideoFontSettings(!showVideoFontSettings)} className="flex items-center gap-1.5 text-slate-600 uppercase">
-                                            <Icon name="sliders" size={12} /> 영상 자막 크기 설정 {showVideoFontSettings ? '▲' : '▼'}
+                                            <Icon name="sliders" size={12} /> 영상 자막 크기 조절 {showVideoFontSettings ? '▲' : '▼'}
                                         </button>
-                                        <button onClick={() => setAllVideoFontSize(18)} className="text-[#1E6F54] bg-[#1E6F54]/10 px-2 py-0.5 rounded transition-colors hover:bg-[#1E6F54]/20">전체 기본값(18px)</button>
+                                        <button onClick={() => setAllVideoFontSize(18)} className="text-[#1E6F54] bg-[#1E6F54]/10 px-2 py-0.5 rounded transition-colors hover:bg-[#1E6F54]/20">전체 18px로</button>
                                     </div>
 
                                     {showVideoFontSettings && (
@@ -487,10 +496,12 @@
                             <div className="p-4 lg:p-5 border-b border-slate-100 flex flex-col gap-3 bg-slate-50">
                                 <div className="space-y-1">
                                     <h3 className="text-sm flex items-center gap-2 text-slate-900 uppercase"><Icon name="list" size={16} className="text-[#1E6F54]" /> 학습 스크립트</h3>
-                                    <p className="text-[9px] text-slate-500 leading-relaxed">
-                                        ※ 언어마다 어순이 다릅니다. 학습 기준 언어를 먼저 선택하세요.<br/>
-                                        ※ 텍스트 드래그 시 즉시 단어 사전 검색이 가능합니다.
-                                    </p>
+                                    <div className="flex flex-col gap-0.5 px-1 py-1 bg-white/50 rounded-lg border border-slate-200/50">
+                                        <p className="text-[9px] text-slate-600 leading-relaxed">
+                                            ※ 언어마다 어순이 다릅니다. 학습 기준 언어를 먼저 선택하세요.<br/>
+                                            ※ 텍스트 드래그 시 즉시 단어 사전 검색이 가능합니다.
+                                        </p>
+                                    </div>
                                 </div>
 
                                 <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-3">
@@ -502,8 +513,8 @@
                                             ))}
                                         </div>
                                     </div>
-                                    <label className="flex items-center gap-1.5 cursor-pointer px-2 py-1 rounded-md border border-slate-200 bg-white shadow-sm">
-                                        <span className="text-[10px] text-slate-500">병음 표시</span>
+                                    <label className="flex items-center gap-1.5 cursor-pointer px-2 py-1 rounded-md border border-slate-200 bg-white shadow-sm hover:bg-slate-50">
+                                        <span className="text-[10px] font-medium text-slate-500">병음 표시</span>
                                         <input type="checkbox" checked={showPinyin} onChange={(e) => setShowPinyin(e.target.checked)} className="sr-only" />
                                         <div className={`w-6 h-3 rounded-full relative transition-colors ${showPinyin ? 'bg-[#1E6F54]' : 'bg-slate-300'}`}>
                                             <div className={`absolute left-0.5 top-0.5 bg-white w-2 h-2 rounded-full transition-transform ${showPinyin ? 'translate-x-3' : 'translate-x-0'}`}></div>
@@ -514,7 +525,7 @@
                                 <div className="space-y-1">
                                     <div className="relative">
                                         <Icon name="search" size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                                        <input type="text" placeholder="스크립트 내용 검색..." className="w-full pl-8 pr-4 py-2 rounded-lg border border-slate-200 text-[11px] outline-none transition-all focus:ring-1 focus:ring-emerald-500 bg-white text-slate-900" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                                        <input type="text" placeholder="스크립트 내용 검색..." className="w-full pl-8 pr-4 py-2 rounded-lg border border-slate-200 text-[11px] outline-none transition-all focus:ring-1 focus:ring-emerald-500 bg-white text-slate-900 font-normal" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                                     </div>
                                     <div className="px-1 text-[9px] text-red-600 flex items-center gap-1">
                                         <Icon name="alert" size={10} /> 문맥에 따라 의역이 포함되어 있을 수 있습니다.
@@ -522,7 +533,6 @@
                                 </div>
                             </div>
 
-                            {/* 스크립트 본문 */}
                             <div ref={scrollRef} onMouseUp={handleMouseUp} className="flex-1 overflow-y-auto p-4 lg:p-5 space-y-4 custom-scrollbar select-text bg-white">
                                 {filteredList.length > 0 ? (
                                     filteredList.map((item, index) => {
@@ -532,41 +542,40 @@
                                                 key={index} 
                                                 ref={el => listItemsRef.current[index] = el}
                                                 onClick={() => seekTo(item.start)} 
-                                                className={`p-4 rounded-xl cursor-pointer transition-all border relative overflow-hidden group ${isActive && searchTerm === "" ? 'bg-emerald-50/50 border-emerald-500/30 ring-1 ring-emerald-500/10' : 'bg-white border-slate-100 hover:border-emerald-500/10'}`}
+                                                className={`p-4 rounded-xl cursor-pointer transition-all border relative overflow-hidden group ${isActive && searchTerm === "" ? 'bg-emerald-50/50 border-emerald-500/30 ring-1 ring-emerald-500/10' : 'bg-white border-slate-100 hover:border-emerald-500/10 hover:shadow-xs'}`}
                                             >
                                                 <div className="flex justify-between items-center mb-2">
-                                                    <span className={`text-[8px] font-mono px-1.5 py-0.5 rounded ${isActive ? 'bg-[#1E6F54] text-white' : 'bg-slate-100 text-slate-500'}`}>{Math.floor(item.start)}s</span>
+                                                    <span className={`text-[8px] font-mono px-1.5 py-0.5 rounded ${isActive ? 'bg-[#1E6F54] text-white shadow-sm' : 'bg-slate-100 text-slate-500'}`}>{Math.floor(item.start)}s</span>
                                                 </div>
                                                 <div className="space-y-3 pointer-events-none text-slate-900">
-                                                    {showKo && item.ko && <p className="leading-snug transition-all text-slate-800" style={{ fontSize: `${scriptSizeKo}px` }}>{highlightText(item.ko, searchWords)}</p>}
+                                                    {showKo && item.ko && <p className="leading-snug transition-all font-normal text-slate-800" style={{ fontSize: `${scriptSizeKo}px` }}>{highlightText(item.ko, searchWords)}</p>}
                                                     {showZh && item.zh && (
                                                         <div className="space-y-1.5">
                                                             {showPinyin && item.pinyin && <span className="px-1.5 py-0.5 inline-block text-[11px] rounded transition-all bg-slate-50 text-slate-500 border border-slate-100 font-normal" style={{ fontSize: `${scriptSizeZh * 0.7}px` }}>{highlightText(item.pinyin, searchWords)}</span>}
-                                                            <p className="leading-relaxed transition-all text-slate-800" style={{ fontSize: `${scriptSizeZh}px` }}>{highlightText(item.zh, searchWords)}</p>
+                                                            <p className="leading-relaxed transition-all font-normal text-slate-800" style={{ fontSize: `${scriptSizeZh}px` }}>{highlightText(item.zh, searchWords)}</p>
                                                         </div>
                                                     )}
-                                                    {showEn && item.en && <p className="leading-relaxed transition-all text-slate-600" style={{ fontSize: `${scriptSizeEn}px` }}>{highlightText(item.en, searchWords)}</p>}
+                                                    {showEn && item.en && <p className="leading-relaxed transition-all font-normal text-slate-500" style={{ fontSize: `${scriptSizeEn}px` }}>{highlightText(item.en, searchWords)}</p>}
                                                 </div>
                                             </div>
                                         );
                                     })
                                 ) : (
-                                    <div className="text-center py-20 opacity-30 italic text-xs text-slate-900">검색 결과가 없습니다.</div>
+                                    <div className="text-center py-20 opacity-30 italic text-xs text-slate-900">데이터가 없거나 검색 결과가 없습니다.</div>
                                 )}
                             </div>
 
-                            {/* 스크립트 설정 하단 */}
                             <div className="px-6 py-3 border-t border-slate-100 flex flex-col gap-2 bg-slate-50">
                                 <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-1.5 text-slate-600 text-[9px] uppercase tracking-widest">
+                                    <div className="flex items-center gap-1.5 text-slate-600 font-black text-[9px] uppercase tracking-widest">
                                         <Icon name="type" size={12} /> 스크립트 텍스트 크기
                                     </div>
-                                    <button onClick={() => setAllScriptSize(18)} className="text-[9px] text-[#1E6F54] hover:underline transition-colors">모두 18px로</button>
+                                    <button onClick={() => setAllScriptSize(18)} className="text-[9px] font-normal text-[#1E6F54] hover:underline transition-colors">모두 18px로</button>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     {[ {label: 'KO', val: scriptSizeKo, set: setScriptSizeKo}, {label: 'ZH', val: scriptSizeZh, set: setScriptSizeZh}, {label: 'EN', val: scriptSizeEn, set: setScriptSizeEn} ].map((l, i) => (
                                         <div key={i} className="flex items-center gap-2">
-                                            <span className="text-[9px] text-slate-500 w-4">{l.label}</span>
+                                            <span className="text-[10px] font-black text-slate-500 w-4">{l.label}</span>
                                             <input type="range" min="10" max="30" value={l.val} onChange={(e) => l.set(Number(e.target.value))} className="flex-1 h-1" />
                                             <span className="text-[9px] font-mono text-slate-700 w-3">{l.val}</span>
                                         </div>
@@ -581,9 +590,9 @@
                                     style={{ left: dictPopup.x, top: dictPopup.y }}
                                     onMouseDown={(e) => e.stopPropagation()} 
                                 >
-                                    <span className="text-[10px] text-emerald-400 truncate max-w-[100px]">"{dictPopup.text}"</span>
+                                    <span className="text-[10px] font-normal text-emerald-400 truncate max-w-[100px]">"{dictPopup.text}"</span>
                                     <div className="w-[1px] h-3 bg-white/20"></div>
-                                    <button onClick={() => openDictionary(dictPopup.text)} className="flex items-center gap-1 bg-[#1E6F54] hover:bg-emerald-500 px-2 py-1 rounded-lg transition-all text-[9px] shadow-lg">
+                                    <button onClick={() => openDictionary(dictPopup.text)} className="flex items-center gap-1 bg-[#1E6F54] hover:bg-emerald-500 px-2 py-1 rounded-lg transition-all text-[9px] font-normal shadow-lg">
                                         <Icon name="external" size={10} /> 사전 검색
                                     </button>
                                 </div>
@@ -594,14 +603,14 @@
                     {/* 푸터 */}
                     <footer className="h-[30px] px-6 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-400 bg-white">
                         <div className="flex items-center gap-4 uppercase tracking-widest">
-                            <span>JW Player Pro v16.8</span>
+                            <span>JW Player Pro v16.9 Archive Edition</span>
                             <div className="flex items-center gap-1 text-emerald-700/60">
                               <Icon name="sync" size={10} className={syncStatus === 'syncing' ? 'animate-spin' : ''} />
-                              Synced with GitHub Library
+                              Auto-Synced with Library
                             </div>
                         </div>
                         <div className="flex items-center gap-4">
-                            <span className="text-emerald-700/50 italic tracking-tight">Smart Library & Auto-Matching System</span>
+                            <span className="text-emerald-700/50 italic font-medium tracking-tight">Smart Library & Auto-Matching System</span>
                         </div>
                     </footer>
                 </div>

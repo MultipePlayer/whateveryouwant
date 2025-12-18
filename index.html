@@ -295,7 +295,7 @@
                                 <button onClick={() => setShowHelp(!showHelp)} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-emerald-600"><Icon name="help" size={14} /></button>
                             </div>
                             <button onClick={handleClipVideo} disabled={isClipping} className={`px-4 py-1.5 ${buttonAccent} text-white text-[10px] font-bold rounded-lg shrink-0 flex items-center gap-2 active:scale-95 disabled:opacity-50 transition-all`}>
-                                {isClipping ? <div className="loading-spinner"></div> : "클리핑"}
+                                {isClipping ? <div className="loading-spinner"></div> : "검색"}
                             </button>
 
                             {showHelp && (
@@ -390,7 +390,7 @@
                                             <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Icon name="mouse" size={10}/> 클릭 시 동작</label>
                                             <div className={`flex p-1 rounded-xl border ${isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-300'}`}>
                                                 <button onClick={() => setClickBehavior('play')} className={`flex-1 py-1.5 rounded-lg text-[9px] font-black transition-all ${clickBehavior === 'play' ? 'bg-[#1E6F54] text-white' : 'text-slate-500'}`}>바로 재생</button>
-                                                <button onClick={() => setClickBehavior('pause')} className={`flex-1 py-1.5 rounded-lg text-[9px] font-black transition-all ${clickBehavior === 'pause' ? 'bg-[#1E6F54] text-white' : 'text-slate-500'}`}>멈춤 이동</button>
+                                                <button onClick={() => setClickBehavior('pause')} className={`flex-1 py-1.5 rounded-lg text-[9px] font-black transition-all ${clickBehavior === 'pause' ? 'bg-[#1E6F54] text-white' : 'text-slate-500'}`}>정지 후 재생</button>
                                             </div>
                                         </div>
                                     </div>

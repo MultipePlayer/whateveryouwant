@@ -4,13 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JW Multiple Subtitle Player</title>
-    <!-- 라이브러리 로드: 마크다운 형식을 제거하고 순수 URL로 수정 -->
+    <!-- 라이브러리 로드 -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* 구글 폰트 주소 수정 */
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap');
         
         body { font-family: 'Noto Sans KR', 'Noto Sans SC', sans-serif; }
@@ -42,6 +41,15 @@
         }
         input[type=range]::-webkit-slider-runnable-track {
             width: 100%; height: 4px; cursor: pointer; background: rgba(30, 111, 84, 0.2); border-radius: 2px;
+        }
+
+        /* 상태 바 애니메이션 */
+        .status-banner {
+            animation: slideDown 0.3s ease-out;
+        }
+        @keyframes slideDown {
+            from { transform: translateY(-100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
         }
     </style>
 </head>
@@ -88,6 +96,11 @@
                         <line x1="12" y1="16" x2="12" y2="12"/>
                         <line x1="12" y1="8" x2="12.01" y2="8"/>
                     </>
+                ),
+                alert: (
+                    <>
+                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </>
                 )
             };
             return (
@@ -101,6 +114,7 @@
             const [videoUrl, setVideoUrl] = useState("");
             const [inputUrl, setInputUrl] = useState("");
             const [isLoading, setIsLoading] = useState(false);
+            const [status, setStatus] = useState({ type: null, message: "" }); // 상태 메시지 (info, error, warning)
             const [isPlaying, setIsPlaying] = useState(false);
             const [currentTime, setCurrentTime] = useState(0);
             const [duration, setDuration] = useState(0);
@@ -125,11 +139,11 @@
             const itemRefs = useRef([]);
             const apiKey = ""; 
 
-            // API 호출 재시도 로직 (Exponential Backoff)
+            // API 호출 재시도 로직
             const fetchWithRetry = async (url, options, retries = 5, delay = 1000) => {
                 try {
                     const response = await fetch(url, options);
-                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
                     return await response.json();
                 } catch (error) {
                     if (retries > 0) {
@@ -142,23 +156,22 @@
 
             // 링크 분석 함수
             const handleAnalyze = async () => {
-                if (!inputUrl.trim()) return;
+                const trimmedUrl = inputUrl.trim();
+                if (!trimmedUrl) {
+                    setStatus({ type: "warning", message: "분석할 주소를 입력해주세요." });
+                    return;
+                }
+                
                 setIsLoading(true);
+                setStatus({ type: "info", message: "영상을 분석하고 자막 데이터를 추출하는 중입니다..." });
+                
                 try {
-                    const prompt = `JW.org URL 분석 요청: "${inputUrl}".
+                    const prompt = `JW.org URL 분석 요청: "${trimmedUrl}".
                     다음 작업을 수행하세요:
                     1. 페이지 내 실제 고화질 MP4 비디오 소스 주소를 찾으세요.
                     2. 한국어(ko), 중국어(zh), 영어(en) 공식 자막 데이터를 추출하세요.
                     3. 중국어 자막은 반드시 "pinyin" 필드에 한어병음을 포함하세요.
-                    4. 결과는 오직 JSON 형식으로만 반환하세요:
-                    {
-                      "videoUrl": "실제 mp4 주소",
-                      "tracks": {
-                        "ko": [{"start": 0, "end": 5, "text": "내용"}],
-                        "zh": [{"start": 0, "end": 5, "text": "内容", "pinyin": "Nèiróng"}],
-                        "en": [{"start": 0, "end": 5, "text": "Content"}]
-                      }
-                    }`;
+                    4. 결과는 오직 JSON 형식으로만 반환하세요.`;
 
                     const result = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
                         method: 'POST',
@@ -166,15 +179,11 @@
                         body: JSON.stringify({
                             contents: [{ parts: [{ text: prompt }] }],
                             tools: [{ "google_search": {} }],
-                            generationConfig: { 
-                                responseMimeType: "application/json"
-                            }
+                            generationConfig: { responseMimeType: "application/json" }
                         })
                     });
 
                     let textResult = result.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-                    
-                    // 마크다운 코드 블록 제거 로직 (SyntaxError 방지)
                     textResult = textResult.replace(/^```json\n?/, "").replace(/\n?```$/, "").trim();
                     
                     const data = JSON.parse(textResult);
@@ -183,12 +192,20 @@
                         setVideoUrl(data.videoUrl);
                         setTracks(data.tracks || { ko: [], zh: [], en: [] });
                         setLoopA(null); setLoopB(null); setIsLooping(false);
+                        setStatus({ type: "success", message: "영상을 성공적으로 불러왔습니다! 학습을 시작하세요." });
+                        // 3초 후 상태 메시지 제거
+                        setTimeout(() => setStatus({ type: null, message: "" }), 3000);
                     } else {
-                        throw new Error("비디오 주소를 찾을 수 없습니다.");
+                        throw new Error("비디오 주소를 찾을 수 없습니다. 올바른 jw.org 페이지 링크인지 확인해주세요.");
                     }
                 } catch (error) {
                     console.error("Analysis Error:", error);
-                    alert("영상 분석에 실패했습니다. 유효한 JW.org 링크인지 확인해주세요.");
+                    let errMsg = "영상 분석에 실패했습니다.";
+                    if (error.message.includes("HTTP 403")) errMsg = "API 키 권한 오류입니다. 설정을 확인해주세요.";
+                    else if (error.message.includes("JSON")) errMsg = "데이터 형식이 올바르지 않습니다. 다시 시도해주세요.";
+                    else if (error.message.includes("found")) errMsg = "해당 페이지에서 영상을 찾을 수 없습니다.";
+                    
+                    setStatus({ type: "error", message: errMsg });
                 } finally {
                     setIsLoading(false);
                 }
@@ -197,7 +214,7 @@
             const togglePlay = () => {
                 if (!videoRef.current) return;
                 if (videoRef.current.paused) {
-                    videoRef.current.play().catch(e => console.warn("Auto-play blocked or failed", e));
+                    videoRef.current.play().catch(e => setStatus({ type: "warning", message: "재생이 차단되었습니다. 화면을 클릭해 직접 재생해주세요." }));
                     setIsPlaying(true);
                 } else {
                     videoRef.current.pause();
@@ -303,6 +320,20 @@
                         </div>
                     </header>
 
+                    {/* 상태 알림 바 */}
+                    {status.message && (
+                        <div className={`status-banner py-2 px-6 flex items-center justify-center gap-3 text-sm font-bold shadow-sm transition-colors ${
+                            status.type === 'error' ? 'bg-red-50 text-red-600 border-b border-red-100' : 
+                            status.type === 'warning' ? 'bg-yellow-50 text-yellow-700 border-b border-yellow-100' : 
+                            status.type === 'success' ? 'bg-emerald-50 text-emerald-700 border-b border-emerald-100' :
+                            'bg-blue-50 text-blue-700 border-b border-blue-100'
+                        }`}>
+                            <Icon name={status.type === 'error' ? 'alert' : 'info'} size={16} />
+                            <span>{status.message}</span>
+                            <button onClick={() => setStatus({ type: null, message: "" })} className="ml-4 opacity-50 hover:opacity-100">×</button>
+                        </div>
+                    )}
+
                     {/* 메인 레이아웃 */}
                     <main className="flex-1 flex flex-col lg:flex-row overflow-hidden p-3 lg:p-6 gap-6 max-w-[1800px] mx-auto w-full">
                         <div className="flex-1 flex flex-col gap-4 min-w-0">
@@ -322,7 +353,7 @@
                                         <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center animate-pulse">
                                             <Icon name="play" size={32} className="text-slate-600 ml-1" />
                                         </div>
-                                        <p className="text-sm font-medium">학습을 시작하려면 주소를 입력하세요.</p>
+                                        <p className="text-sm font-medium">학습을 시작하려면 상단에 링크를 입력하세요.</p>
                                     </div>
                                 )}
 
@@ -516,7 +547,7 @@
                     </main>
 
                     <footer className="h-8 bg-white border-t flex items-center justify-between px-6 shrink-0 text-[10px] font-bold text-slate-300 uppercase tracking-widest">
-                        <span>JW MULTIPLE PLAYER PRO V2.1</span>
+                        <span>JW MULTIPLE PLAYER PRO V2.2</span>
                         <span>DESIGNED FOR LEARNING SEAMLESSLY</span>
                     </footer>
                 </div>

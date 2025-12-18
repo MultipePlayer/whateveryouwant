@@ -67,7 +67,7 @@
             text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 2px 4px rgba(0,0,0,0.8);
         }
 
-        /* 가독성을 위해 모든 본문 텍스트에서 굵기 제거 */
+        /* 가독성을 위해 모든 본문 텍스트에서 굵기(Bold) 제거 */
         * { font-weight: 400 !important; }
         /* 제목과 로고만 예외적으로 강조 */
         nav h1, h3, .brand-logo, .status-badge { font-weight: 800 !important; }
@@ -75,14 +75,14 @@
         .pinyin-font { font-family: sans-serif; letter-spacing: 0.01em; }
     </style>
 </head>
-<body class="bg-white text-slate-900">
+<body class="bg-white text-slate-900 font-sans">
     <div id="root"></div>
 
     <script type="text/babel">
         const { useState, useRef, useEffect, useMemo } = React;
 
         const apiKey = ""; // Gemini API Key
-        // 사용자의 깃허브 아카이브 인덱스 URL
+        // 사용자 지정 GitHub 데이터 인덱스 URL
         const DEFAULT_ARCHIVE_URL = "https://raw.githubusercontent.com/MultipePlayer/whateveryouwant/refs/heads/main/data/jw_data_index.json";
 
         const Icon = ({ name, size = 14, className = "" }) => {
@@ -97,8 +97,8 @@
                 mouse: <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z M13 13l6 6"></path>,
                 help: <><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></>,
                 globe: <><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></>,
-                sync: <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" />,
                 alert: <><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></>,
+                sync: <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" />,
                 external: <><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></>,
                 type: <><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="12" y1="4" x2="12" y2="20"></line><line x1="9" y1="20" x2="15" y2="20"></line></>
             };
@@ -118,8 +118,8 @@
             const [playbackRate, setPlaybackRate] = useState(1.0); 
             const [isClipping, setIsClipping] = useState(false);
             const [showHelp, setShowHelp] = useState(false);
-            const [dataLibrary, setDataLibrary] = useState({}); 
-            const [syncStatus, setSyncStatus] = useState("idle"); 
+            const [dataLibrary, setDataLibrary] = useState({}); // 통합 라이브러리
+            const [syncStatus, setSyncStatus] = useState("idle"); // idle, syncing, ready, error
 
             const [activeIdxKo, setActiveIdxKo] = useState(-1);
             const [activeIdxEn, setActiveIdxEn] = useState(-1);
@@ -161,8 +161,8 @@
                     try {
                         // 1. 지도 읽기
                         const indexRes = await fetch(DEFAULT_ARCHIVE_URL);
-                        if (!indexRes.ok) throw new Error("지도 파일을 읽을 수 없습니다.");
-                        const fileList = await indexRes.json(); // ["jw_multilingual_data_1.json", ...]
+                        if (!indexRes.ok) throw new Error("Index load failed");
+                        const fileList = await indexRes.json();
 
                         const baseUrl = DEFAULT_ARCHIVE_URL.substring(0, DEFAULT_ARCHIVE_URL.lastIndexOf('/'));
                         let mergedLibrary = {};
@@ -179,9 +179,9 @@
                                             mergedLibrary[item.natural_key] = {
                                                 videoUrl: item.url,
                                                 tracks: {
-                                                    ko: item.scripts.ko || [],
-                                                    en: item.scripts.en || [],
-                                                    zh: item.scripts.cn || [] // 수집기 필드명 'cn' 대응
+                                                    ko: item.scripts?.ko || [],
+                                                    en: item.scripts?.en || [],
+                                                    zh: item.scripts?.cn || item.scripts?.zh || [] // cn/zh 혼용 대응
                                                 }
                                             };
                                         }
@@ -191,23 +191,22 @@
                                 console.warn(`조각 ${fileName} 로드 실패`);
                             }
                         }
-
                         setDataLibrary(mergedLibrary);
                         setSyncStatus("ready");
                     } catch (e) {
-                        console.error("동기화 오류:", e);
+                        console.error("동기화 실패:", e);
                         setSyncStatus("error");
                     }
                 };
                 syncArchive();
             }, []);
 
-            // 링크에서 미디어 코드 추출 (해시 링크 포함)
+            // 링크에서 미디어 코드 추출 (해시 및 인코딩 주소 대응 강화)
             const getMediaCode = (url) => {
                 if (!url) return null;
                 const decodedUrl = decodeURIComponent(url);
                 
-                // 1. 해시 파싱 (#ko/mediaitems/.../pub-code_VIDEO)
+                // 1. 해시 파싱 (#ko/mediaitems/.../CODE)
                 const hashPart = decodedUrl.split('#')[1];
                 if (hashPart) {
                     const segments = hashPart.split('/');
@@ -215,7 +214,7 @@
                     if (last) return last.replace('_VIDEO', '').trim();
                 }
                 
-                // 2. Query Parameter 추출 (item=CODE)
+                // 2. 쿼리 파라미터 (item=CODE)
                 const searchParams = new URLSearchParams(decodedUrl.split('?')[1]);
                 if (searchParams.has('item')) return searchParams.get('item').replace('_VIDEO', '').trim();
                 
@@ -243,7 +242,10 @@
 
                 // 2. 라이브러리에 없는 경우 실시간 분석 시도 (Gemini)
                 try {
-                    const prompt = `Analyze URL: "${inputUrl}". Find direct MP4 and transcripts for ko, zh (with pinyin), en. Return JSON: { "videoUrl": "string", "tracks": { "ko": [], "zh": [], "en": [] } }. Precise float timestamps required.`;
+                    const prompt = `Analyze URL: "${inputUrl}". Find direct MP4 link and transcripts for ko, zh (with pinyin), en. 
+                    Special instruction: Extract any media identifier like "pub-jwb-133_3_VIDEO" and get its resources.
+                    Return valid JSON only: { "videoUrl": "string", "tracks": { "ko": [], "zh": [], "en": [] } }. Precise timestamps (float seconds) required.`;
+                    
                     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -255,7 +257,7 @@
                         setVideoUrl(data.videoUrl);
                         if (data.tracks) setTracks(data.tracks);
                     } else {
-                        alert("라이브러리 및 실시간 분석에서 정보를 찾지 못했습니다. 미디어 코드가 아카이브에 있는지 확인해 주세요.");
+                        alert("라이브러리에 데이터가 없으며 실시간 분석에도 실패했습니다. 미디어 코드가 인덱스에 있는지 확인해 주세요.");
                     }
                 } catch (err) {
                     alert("데이터 분석 중 오류가 발생했습니다.");
@@ -382,7 +384,7 @@
                             </button>
                         </div>
                         <div className="flex items-center gap-2">
-                             <div className={`text-[9px] px-2 py-0.5 rounded-full border flex items-center gap-1.5 ${syncStatus === 'ready' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200 shadow-inner'}`}>
+                             <div className={`text-[9px] px-2 py-0.5 rounded-full border flex items-center gap-1.5 ${syncStatus === 'ready' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
                                 <Icon name="sync" size={10} className={syncStatus === 'syncing' ? 'animate-spin' : ''} />
                                 {syncStatus === 'ready' ? 'Archive Loaded' : syncStatus === 'syncing' ? 'Syncing...' : 'Sync Pending'}
                              </div>
@@ -517,7 +519,7 @@
                                 <div className="space-y-1">
                                     <h3 className="text-sm flex items-center gap-2 text-slate-900 uppercase font-black"><Icon name="list" size={16} className="text-[#1E6F54]" /> 학습 스크립트</h3>
                                     <div className="flex flex-col gap-0.5 px-1 py-1 bg-white/50 rounded-lg border border-slate-200/50">
-                                        <p className="text-[9px] text-slate-600 leading-relaxed">
+                                        <p className="text-[9px] text-slate-600 leading-relaxed font-normal">
                                             ※ 언어마다 어순이 다릅니다. 학습 기준 언어를 먼저 선택하세요.<br/>
                                             ※ 텍스트 드래그 시 즉시 단어 사전 검색이 가능합니다.
                                         </p>
@@ -545,7 +547,7 @@
                                 <div className="space-y-1">
                                     <div className="relative">
                                         <Icon name="search" size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                                        <input type="text" placeholder="스크립트 내용 검색..." className="w-full pl-8 pr-4 py-2 rounded-lg border border-slate-200 text-[11px] outline-none transition-all focus:ring-1 focus:ring-emerald-500 bg-white text-slate-900" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                                        <input type="text" placeholder="스크립트 내용 검색..." className="w-full pl-8 pr-4 py-2 rounded-lg border border-slate-200 text-[11px] outline-none transition-all focus:ring-1 focus:ring-emerald-500 bg-white text-slate-900 font-medium" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                                     </div>
                                     <div className="px-1 text-[9px] text-red-600 flex items-center gap-1 font-medium">
                                         <Icon name="alert" size={10} /> 문맥에 따라 의역이 포함되어 있을 수 있으니 참고하시기 바랍니다.
@@ -562,16 +564,16 @@
                                                 key={index} 
                                                 ref={el => listItemsRef.current[index] = el}
                                                 onClick={() => seekTo(item.start)} 
-                                                className={`p-4 rounded-xl cursor-pointer transition-all border relative overflow-hidden group ${isActive && searchTerm === "" ? 'bg-emerald-50/50 border-emerald-500/30 ring-1 ring-emerald-500/10 shadow-sm' : 'bg-white border-slate-100 hover:border-emerald-500/10'}`}
+                                                className={`p-4 rounded-xl cursor-pointer transition-all border relative overflow-hidden group ${isActive && searchTerm === "" ? 'bg-emerald-50/50 border-emerald-500/30 ring-1 ring-emerald-500/10' : 'bg-white border-slate-100 hover:border-emerald-500/10'}`}
                                             >
                                                 <div className="flex justify-between items-center mb-2">
-                                                    <span className={`text-[8px] font-mono px-1.5 py-0.5 rounded ${isActive ? 'bg-[#1E6F54] text-white shadow-sm' : 'bg-slate-100 text-slate-500'}`}>{Math.floor(item.start)}s</span>
+                                                    <span className={`text-[8px] font-mono px-1.5 py-0.5 rounded font-medium ${isActive ? 'bg-[#1E6F54] text-white shadow-sm' : 'bg-slate-100 text-slate-500'}`}>{Math.floor(item.start)}s</span>
                                                 </div>
                                                 <div className="space-y-3 pointer-events-none text-slate-900">
                                                     {showKo && item.ko && <p className="leading-snug transition-all text-slate-800" style={{ fontSize: `${scriptSizeKo}px` }}>{highlightText(item.ko, searchWords)}</p>}
                                                     {showZh && item.zh && (
                                                         <div className="space-y-1.5">
-                                                            {showPinyin && item.pinyin && <span className="px-1.5 py-0.5 inline-block text-[11px] rounded transition-all bg-slate-50 text-slate-500 border border-slate-100 pinyin-font" style={{ fontSize: `${scriptSizeZh * 0.7}px` }}>{highlightText(item.pinyin, searchWords)}</span>}
+                                                            {showPinyin && item.pinyin && <span className="px-1.5 py-0.5 inline-block text-[11px] rounded transition-all bg-slate-50 text-slate-500 border border-slate-100 font-normal pinyin-font" style={{ fontSize: `${scriptSizeZh * 0.7}px` }}>{highlightText(item.pinyin, searchWords)}</span>}
                                                             <p className="leading-relaxed transition-all text-slate-800 font-normal" style={{ fontSize: `${scriptSizeZh}px` }}>{highlightText(item.zh, searchWords)}</p>
                                                         </div>
                                                     )}
@@ -623,14 +625,14 @@
                     {/* 푸터 */}
                     <footer className="h-[30px] px-6 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-400 bg-white">
                         <div className="flex items-center gap-4 uppercase tracking-widest font-black status-badge">
-                            <span>JW Player Pro v20.0 Archive Deep-Sync</span>
+                            <span>JW Player Pro v21.0 Hash & Index Integrated</span>
                             <div className="flex items-center gap-1 text-emerald-700/60">
                               <Icon name="sync" size={10} className={syncStatus === 'syncing' ? 'animate-spin' : ''} />
                               Archive Synced
                             </div>
                         </div>
                         <div className="flex items-center gap-4">
-                            <span className="text-emerald-700/50 italic tracking-tight font-black status-badge">Enhanced Multilingual Library</span>
+                            <span className="text-emerald-700/50 italic tracking-tight font-black status-badge">Enhanced Learning Design</span>
                         </div>
                     </footer>
                 </div>

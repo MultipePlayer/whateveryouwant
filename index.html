@@ -43,7 +43,6 @@
             width: 100%; height: 4px; cursor: pointer; background: rgba(30, 111, 84, 0.2); border-radius: 2px;
         }
 
-        /* 상태 바 애니메이션 */
         .status-banner {
             animation: slideDown 0.3s ease-out;
         }
@@ -59,42 +58,33 @@
     <script type="text/babel">
         const { useState, useRef, useEffect, useMemo } = React;
 
-        // 아이콘 컴포넌트
         const Icon = ({ name, size = 16, className = "" }) => {
             const icons = {
                 play: <path d="M5 3l14 9-14 9V3z" />,
                 pause: <path d="M6 4h4v16H6zm8 0h4v16h-4z" />,
                 globe: (
                     <>
-                        <circle cx="12" cy="12" r="10"/>
-                        <line x1="2" y1="12" x2="22" y2="12"/>
-                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                        <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
                     </>
                 ),
                 search: (
                     <>
-                        <circle cx="11" cy="11" r="8"/>
-                        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
                     </>
                 ),
                 settings: (
                     <>
-                        <circle cx="12" cy="12" r="3"/>
-                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                        <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
                     </>
                 ),
                 external: (
                     <>
-                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                        <path d="M15 3h6v6"/>
-                        <path d="M10 14L21 3"/>
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/>
                     </>
                 ),
-                info: (
+                database: (
                     <>
-                        <circle cx="12" cy="12" r="10"/>
-                        <line x1="12" y1="16" x2="12" y2="12"/>
-                        <line x1="12" y1="8" x2="12.01" y2="8"/>
+                        <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
                     </>
                 ),
                 alert: (
@@ -114,7 +104,7 @@
             const [videoUrl, setVideoUrl] = useState("");
             const [inputUrl, setInputUrl] = useState("");
             const [isLoading, setIsLoading] = useState(false);
-            const [status, setStatus] = useState({ type: null, message: "" }); // 상태 메시지 (info, error, warning)
+            const [status, setStatus] = useState({ type: null, message: "" });
             const [isPlaying, setIsPlaying] = useState(false);
             const [currentTime, setCurrentTime] = useState(0);
             const [duration, setDuration] = useState(0);
@@ -124,6 +114,11 @@
             const [activeIndices, setActiveIndices] = useState({ ko: -1, zh: -1, en: -1 });
             const [anchorLang, setAnchorLang] = useState('ko');
             
+            // 아카이브 데이터
+            const [archiveData, setArchiveData] = useState([]);
+            const [archiveUrl, setArchiveUrl] = useState(""); // 깃허브 JSON URL
+            const [showArchive, setShowArchive] = useState(false);
+
             const [showLangs, setShowLangs] = useState({ ko: true, zh: true, en: true });
             const [showPinyin, setShowPinyin] = useState(true);
             const [videoFontSize, setVideoFontSize] = useState(20);
@@ -139,41 +134,101 @@
             const itemRefs = useRef([]);
             const apiKey = ""; 
 
-            // API 호출 재시도 로직
-            const fetchWithRetry = async (url, options, retries = 5, delay = 1000) => {
+            // VTT 파싱 함수 (Python collector.py 로직 이식)
+            const parseVTT = async (url) => {
+                if (!url) return [];
                 try {
-                    const response = await fetch(url, options);
-                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                    return await response.json();
-                } catch (error) {
-                    if (retries > 0) {
-                        await new Promise(res => setTimeout(res, delay));
-                        return fetchWithRetry(url, options, retries - 1, delay * 2);
-                    }
-                    throw error;
-                }
+                    const res = await fetch(url);
+                    const text = await res.text();
+                    const lines = text.split(/\r?\n/);
+                    const scriptData = [];
+                    let currentStart = 0;
+                    let currentText = [];
+                    const timePattern = /((?:\d{2}:)?\d{2}:\d{2}\.\d{3})\s*-->/;
+
+                    const timeToSeconds = (str) => {
+                        const parts = str.split(':');
+                        if (parts.length === 3) {
+                            const [h, m, s_ms] = parts;
+                            const [s, ms] = s_ms.split('.');
+                            return parseInt(h) * 3600 + parseInt(m) * 60 + parseInt(s) + parseInt(ms) / 1000;
+                        } else {
+                            const [m, s_ms] = parts;
+                            const [s, ms] = s_ms.split('.');
+                            return parseInt(m) * 60 + parseInt(s) + parseInt(ms) / 1000;
+                        }
+                    };
+
+                    lines.forEach(line => {
+                        const match = line.match(timePattern);
+                        if (match) {
+                            if (currentText.length > 0) {
+                                scriptData.push({ start: currentStart, end: timeToSeconds(match[1]), text: currentText.join(' ').replace(/<[^>]+>/g, '').trim() });
+                            }
+                            currentStart = timeToSeconds(match[1]);
+                            currentText = [];
+                        } else if (line.trim() && !line.includes('WEBVTT') && !line.includes('NOTE') && !/^\d+$/.test(line.trim())) {
+                            currentText.push(line.trim());
+                        }
+                    });
+                    return scriptData;
+                } catch (e) { return []; }
             };
 
-            // 링크 분석 함수
-            const handleAnalyze = async () => {
-                const trimmedUrl = inputUrl.trim();
-                if (!trimmedUrl) {
-                    setStatus({ type: "warning", message: "분석할 주소를 입력해주세요." });
-                    return;
+            // JW API 직접 호출 함수
+            const fetchJWMedia = async (naturalKey) => {
+                const langs = { ko: 'KO', en: 'E', zh: 'CHS' };
+                const results = { videoUrl: "", tracks: { ko: [], en: [], zh: [] } };
+
+                for (const [key, code] of Object.entries(langs)) {
+                    try {
+                        const api = `https://b.jw-cdn.org/apis/mediator/v1/media-items/${code}/${naturalKey}?clientType=www`;
+                        const res = await fetch(api);
+                        const data = await res.json();
+                        const media = data.media?.[0];
+                        if (!media) continue;
+
+                        const file720 = media.files?.find(f => f.label === '720p') || media.files?.[0];
+                        if (key === 'ko') results.videoUrl = file720?.progressiveDownloadURL;
+                        
+                        const subUrl = file720?.subtitles?.url || media.files?.find(f => f.subtitles)?.subtitles?.url;
+                        if (subUrl) {
+                            results.tracks[key] = await parseVTT(subUrl);
+                        }
+                    } catch (e) { console.error(e); }
                 }
+                return results;
+            };
+
+            const handleAnalyze = async () => {
+                const url = inputUrl.trim();
+                if (!url) return;
                 
                 setIsLoading(true);
-                setStatus({ type: "info", message: "영상을 분석하고 자막 데이터를 추출하는 중입니다..." });
-                
-                try {
-                    const prompt = `JW.org URL 분석 요청: "${trimmedUrl}".
-                    다음 작업을 수행하세요:
-                    1. 페이지 내 실제 고화질 MP4 비디오 소스 주소를 찾으세요.
-                    2. 한국어(ko), 중국어(zh), 영어(en) 공식 자막 데이터를 추출하세요.
-                    3. 중국어 자막은 반드시 "pinyin" 필드에 한어병음을 포함하세요.
-                    4. 결과는 오직 JSON 형식으로만 반환하세요.`;
+                setStatus({ type: "info", message: "영상 데이터를 추출하는 중입니다..." });
 
-                    const result = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                try {
+                    // 1. URL에서 naturalKey 추출 시도
+                    const keyMatch = url.match(/pub-(\w+)_VIDEO/) || url.match(/item=(\w+)/) || url.match(/pub-(\w+)/);
+                    const naturalKey = keyMatch ? keyMatch[1] : null;
+
+                    if (naturalKey) {
+                        setStatus({ type: "info", message: `ID(${naturalKey})를 식별했습니다. API에서 직접 데이터를 가져옵니다...` });
+                        const directData = await fetchJWMedia(naturalKey);
+                        if (directData.videoUrl) {
+                            setVideoUrl(directData.videoUrl);
+                            setTracks(directData.tracks);
+                            setStatus({ type: "success", message: "API를 통해 데이터를 성공적으로 가져왔습니다." });
+                            setTimeout(() => setStatus({ type: null, message: "" }), 3000);
+                            setIsLoading(false);
+                            return;
+                        }
+                    }
+
+                    // 2. 실패 시 Gemini AI 분석 (기존 방식)
+                    setStatus({ type: "info", message: "다이렉트 추출 실패. AI 분석을 시작합니다..." });
+                    const prompt = `JW.org URL 분석: "${url}". 고화질 MP4 및 KO, EN, ZH(pinyin 포함) 자막 데이터를 JSON으로 반환하세요.`;
+                    const result = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -181,31 +236,37 @@
                             tools: [{ "google_search": {} }],
                             generationConfig: { responseMimeType: "application/json" }
                         })
-                    });
+                    }).then(r => r.json());
 
-                    let textResult = result.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-                    textResult = textResult.replace(/^```json\n?/, "").replace(/\n?```$/, "").trim();
-                    
-                    const data = JSON.parse(textResult);
-                    
+                    const data = JSON.parse(result.candidates?.[0]?.content?.parts?.[0]?.text || "{}");
                     if (data.videoUrl) {
                         setVideoUrl(data.videoUrl);
-                        setTracks(data.tracks || { ko: [], zh: [], en: [] });
-                        setLoopA(null); setLoopB(null); setIsLooping(false);
-                        setStatus({ type: "success", message: "영상을 성공적으로 불러왔습니다! 학습을 시작하세요." });
-                        // 3초 후 상태 메시지 제거
-                        setTimeout(() => setStatus({ type: null, message: "" }), 3000);
+                        setTracks(data.tracks);
+                        setStatus({ type: "success", message: "AI가 데이터를 성공적으로 추출했습니다." });
                     } else {
-                        throw new Error("비디오 주소를 찾을 수 없습니다. 올바른 jw.org 페이지 링크인지 확인해주세요.");
+                        throw new Error("분석 불가");
                     }
                 } catch (error) {
-                    console.error("Analysis Error:", error);
-                    let errMsg = "영상 분석에 실패했습니다.";
-                    if (error.message.includes("HTTP 403")) errMsg = "API 키 권한 오류입니다. 설정을 확인해주세요.";
-                    else if (error.message.includes("JSON")) errMsg = "데이터 형식이 올바르지 않습니다. 다시 시도해주세요.";
-                    else if (error.message.includes("found")) errMsg = "해당 페이지에서 영상을 찾을 수 없습니다.";
-                    
-                    setStatus({ type: "error", message: errMsg });
+                    setStatus({ type: "error", message: "영상 로드에 실패했습니다. 아카이브에서 검색하거나 주소를 확인해주세요." });
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            // 아카이브 데이터 로드 (파이썬 결과물 연동)
+            const syncArchive = async () => {
+                if (!archiveUrl) {
+                    setStatus({ type: "warning", message: "연동할 JSON 주소를 입력해주세요." });
+                    return;
+                }
+                setIsLoading(true);
+                try {
+                    const res = await fetch(archiveUrl);
+                    const data = await res.json();
+                    setArchiveData(Array.isArray(data) ? data : []);
+                    setStatus({ type: "success", message: `${data.length}개의 영상을 아카이브에서 불러왔습니다.` });
+                } catch (e) {
+                    setStatus({ type: "error", message: "아카이브 파일을 불러오지 못했습니다. URL을 확인하세요." });
                 } finally {
                     setIsLoading(false);
                 }
@@ -214,7 +275,7 @@
             const togglePlay = () => {
                 if (!videoRef.current) return;
                 if (videoRef.current.paused) {
-                    videoRef.current.play().catch(e => setStatus({ type: "warning", message: "재생이 차단되었습니다. 화면을 클릭해 직접 재생해주세요." }));
+                    videoRef.current.play().catch(() => {});
                     setIsPlaying(true);
                 } else {
                     videoRef.current.pause();
@@ -226,336 +287,181 @@
                 if (!videoRef.current) return;
                 const time = videoRef.current.currentTime;
                 setCurrentTime(time);
-
-                if (isLooping && loopA !== null && loopB !== null && time >= loopB) {
-                    videoRef.current.currentTime = loopA;
-                }
+                if (isLooping && loopA !== null && loopB !== null && time >= loopB) videoRef.current.currentTime = loopA;
 
                 const findIdx = (track) => (track || []).findIndex(t => time >= t.start && time < t.end);
-                setActiveIndices({
-                    ko: findIdx(tracks.ko),
-                    zh: findIdx(tracks.zh),
-                    en: findIdx(tracks.en)
-                });
-            };
-
-            const seekTo = (time) => {
-                if (videoRef.current) {
-                    videoRef.current.currentTime = time;
-                    videoRef.current.play().catch(() => {});
-                    setIsPlaying(true);
-                }
-            };
-
-            useEffect(() => {
-                const leadIdx = activeIndices[anchorLang];
-                if (leadIdx !== -1 && scrollRef.current && itemRefs.current[leadIdx] && searchTerm === "") {
-                    const container = scrollRef.current;
-                    const element = itemRefs.current[leadIdx];
-                    const offset = leadIdx === 0 ? 0 : element.offsetTop - 20;
-                    container.scrollTo({ top: offset, behavior: 'smooth' });
-                }
-            }, [activeIndices, anchorLang, searchTerm]);
-
-            const openDict = (text) => {
-                if (!text) return;
-                const url = `https://dict.naver.com/search.nhn?query=${encodeURIComponent(text)}`;
-                window.open(url, '_blank', 'width=1000,height=800');
-            };
-
-            const highlightSearch = (text) => {
-                if (!searchTerm || !text) return text;
-                const safeSearchTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                const parts = text.split(new RegExp(`(${safeSearchTerm})`, 'gi'));
-                return parts.map((p, i) => p.toLowerCase() === searchTerm.toLowerCase() ? <mark key={i} className="bg-yellow-200 rounded px-0.5">{p}</mark> : p);
+                setActiveIndices({ ko: findIdx(tracks.ko), zh: findIdx(tracks.zh), en: findIdx(tracks.en) });
             };
 
             const mergedList = useMemo(() => {
                 const leadTrack = tracks[anchorLang] || [];
                 return leadTrack.map((item, idx) => {
                     const midTime = (item.start + item.end) / 2;
-                    const findPartner = (track) => (track || []).find(t => midTime >= t.start && midTime < t.end) || (track || []).find(t => item.start >= t.start && item.start < t.end);
-                    return {
-                        id: idx,
-                        start: item.start,
-                        end: item.end,
-                        ko: anchorLang === 'ko' ? item.text : findPartner(tracks.ko)?.text || "",
-                        zh: anchorLang === 'zh' ? item.text : findPartner(tracks.zh)?.text || "",
-                        pinyin: anchorLang === 'zh' ? item.pinyin : findPartner(tracks.zh)?.pinyin || "",
-                        en: anchorLang === 'en' ? item.text : findPartner(tracks.en)?.text || ""
-                    };
+                    const findP = (track) => (track || []).find(t => midTime >= t.start && midTime < t.end) || (track || []).find(t => item.start >= t.start && item.start < t.end);
+                    return { id: idx, start: item.start, end: item.end, ko: anchorLang === 'ko' ? item.text : findP(tracks.ko)?.text || "", zh: anchorLang === 'zh' ? item.text : findP(tracks.zh)?.text || "", pinyin: anchorLang === 'zh' ? item.pinyin : findP(tracks.zh)?.pinyin || "", en: anchorLang === 'en' ? item.text : findP(tracks.en)?.text || "" };
                 });
             }, [tracks, anchorLang]);
 
-            const filteredList = mergedList.filter(item => 
-                `${item.ko} ${item.zh} ${item.en} ${item.pinyin}`.toLowerCase().includes(searchTerm.toLowerCase())
-            );
+            const filteredList = mergedList.filter(item => `${item.ko} ${item.zh} ${item.en} ${item.pinyin}`.toLowerCase().includes(searchTerm.toLowerCase()));
 
             return (
-                <div className="flex flex-col h-screen max-h-screen">
-                    {/* 상단바 */}
-                    <header className="h-14 bg-white border-b flex items-center px-4 lg:px-6 shrink-0 z-50">
-                        <div className="flex items-center gap-3 w-full max-w-7xl mx-auto">
-                            <div className="bg-[#1E6F54] p-1.5 rounded-lg text-white font-bold text-xs uppercase tracking-tighter">JW PRO</div>
+                <div className="flex flex-col h-screen max-h-screen bg-slate-50 font-sans">
+                    {/* 헤더 */}
+                    <header className="h-14 bg-white border-b flex items-center px-4 lg:px-6 shrink-0 z-50 shadow-sm">
+                        <div className="flex items-center gap-4 w-full max-w-7xl mx-auto">
+                            <div className="bg-[#1E6F54] p-1.5 rounded-lg text-white font-black text-xs">JW PRO</div>
                             <div className="flex-1 flex gap-2">
-                                <div className="relative flex-1 group">
-                                    <Icon name="globe" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-600" />
-                                    <input 
-                                        type="text" 
-                                        placeholder="JW.org 영상 링크를 붙여넣으세요..."
-                                        className="w-full pl-9 pr-4 py-2 bg-slate-100 border-none rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                                        value={inputUrl}
-                                        onChange={(e) => setInputUrl(e.target.value)}
-                                        onKeyDown={(e) => e.key === 'Enter' && handleAnalyze()}
-                                    />
-                                </div>
-                                <button 
-                                    onClick={handleAnalyze}
-                                    disabled={isLoading}
-                                    className="px-6 py-2 bg-[#1E6F54] hover:bg-[#165a43] text-white rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50"
-                                >
-                                    {isLoading ? <span className="loading-dots">분석 중</span> : "시작하기"}
+                                <input 
+                                    type="text" 
+                                    placeholder="JW.org 영상 링크 붙여넣기..."
+                                    className="flex-1 px-4 py-2 bg-slate-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                                    value={inputUrl}
+                                    onChange={(e) => setInputUrl(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleAnalyze()}
+                                />
+                                <button onClick={handleAnalyze} disabled={isLoading} className="px-5 py-2 bg-[#1E6F54] text-white rounded-xl text-sm font-bold shadow-md active:scale-95 disabled:opacity-50 transition-all">
+                                    {isLoading ? "분석 중" : "불러오기"}
+                                </button>
+                                <button onClick={() => setShowArchive(!showArchive)} className={`p-2 rounded-xl border transition-all ${showArchive ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-400 border-slate-200'}`}>
+                                    <Icon name="database" size={18} />
                                 </button>
                             </div>
                         </div>
                     </header>
 
-                    {/* 상태 알림 바 */}
                     {status.message && (
-                        <div className={`status-banner py-2 px-6 flex items-center justify-center gap-3 text-sm font-bold shadow-sm transition-colors ${
-                            status.type === 'error' ? 'bg-red-50 text-red-600 border-b border-red-100' : 
-                            status.type === 'warning' ? 'bg-yellow-50 text-yellow-700 border-b border-yellow-100' : 
-                            status.type === 'success' ? 'bg-emerald-50 text-emerald-700 border-b border-emerald-100' :
-                            'bg-blue-50 text-blue-700 border-b border-blue-100'
-                        }`}>
-                            <Icon name={status.type === 'error' ? 'alert' : 'info'} size={16} />
-                            <span>{status.message}</span>
-                            <button onClick={() => setStatus({ type: null, message: "" })} className="ml-4 opacity-50 hover:opacity-100">×</button>
+                        <div className={`status-banner py-2 px-6 flex items-center justify-center gap-3 text-xs font-bold ${status.type === 'error' ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-700'}`}>
+                            <Icon name={status.type === 'error' ? 'alert' : 'info'} size={14} /> {status.message}
                         </div>
                     )}
 
                     {/* 메인 레이아웃 */}
                     <main className="flex-1 flex flex-col lg:flex-row overflow-hidden p-3 lg:p-6 gap-6 max-w-[1800px] mx-auto w-full">
-                        <div className="flex-1 flex flex-col gap-4 min-w-0">
-                            <div className="aspect-video bg-black rounded-3xl overflow-hidden shadow-2xl relative group border-4 border-white">
-                                {videoUrl ? (
-                                    <video 
-                                        ref={videoRef}
-                                        src={videoUrl}
-                                        className="w-full h-full object-contain cursor-pointer"
-                                        onTimeUpdate={handleTimeUpdate}
-                                        onLoadedMetadata={(e) => setDuration(e.target.duration)}
-                                        onClick={togglePlay}
-                                        playsInline
-                                    />
-                                ) : (
-                                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 gap-4">
-                                        <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center animate-pulse">
-                                            <Icon name="play" size={32} className="text-slate-600 ml-1" />
-                                        </div>
-                                        <p className="text-sm font-medium">학습을 시작하려면 상단에 링크를 입력하세요.</p>
+                        
+                        {/* 왼쪽: 플레이어 */}
+                        <div className="flex-1 flex flex-col gap-4 min-w-0 overflow-y-auto custom-scrollbar">
+                            {showArchive && (
+                                <div className="bg-white p-5 rounded-3xl border border-emerald-100 shadow-sm space-y-4 animate-in">
+                                    <h4 className="text-sm font-black text-emerald-800 flex items-center gap-2"><Icon name="database" size={16}/> 아카이브 아카이브 매니저</h4>
+                                    <div className="flex gap-2">
+                                        <input type="text" placeholder="JSON 데이터 주소 (GitHub Raw URL)..." className="flex-1 px-3 py-2 bg-slate-50 border rounded-lg text-xs" value={archiveUrl} onChange={e => setArchiveUrl(e.target.value)} />
+                                        <button onClick={syncArchive} className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold">동기화</button>
                                     </div>
-                                )}
-
-                                <div className="absolute inset-x-0 bottom-0 p-6 flex flex-col items-center justify-end pointer-events-none text-center h-1/2">
-                                    <div className="space-y-2 max-w-[90%] drop-shadow-lg">
-                                        {showLangs.ko && activeIndices.ko !== -1 && tracks.ko[activeIndices.ko] && (
-                                            <div className="bg-black/60 backdrop-blur-sm text-white px-4 py-1.5 rounded-xl inline-block text-outline font-medium" style={{ fontSize: `${videoFontSize}px` }}>
-                                                {tracks.ko[activeIndices.ko].text}
+                                    <div className="max-h-60 overflow-y-auto space-y-2 text-xs">
+                                        {archiveData.length > 0 ? archiveData.map((v, i) => (
+                                            <div key={i} className="p-2 border rounded-lg hover:bg-emerald-50 cursor-pointer flex justify-between" onClick={() => { setVideoUrl(v.url); setTracks(v.scripts); setShowArchive(false); setInputUrl(v.url); }}>
+                                                <span className="font-bold">{v.title}</span>
+                                                <span className="text-slate-400">{v.date}</span>
                                             </div>
-                                        )}
+                                        )) : <p className="text-slate-400 italic text-center py-4">동기화된 데이터가 없습니다.</p>}
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="aspect-video bg-black rounded-3xl overflow-hidden shadow-2xl relative border-4 border-white group">
+                                {videoUrl ? <video ref={videoRef} src={videoUrl} className="w-full h-full object-contain cursor-pointer" onTimeUpdate={handleTimeUpdate} onLoadedMetadata={e => setDuration(e.target.duration)} onClick={togglePlay} playsInline /> 
+                                : <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 gap-4"><Icon name="play" size={48} className="opacity-20"/><p className="text-sm">링크를 입력하거나 아카이브에서 영상을 선택하세요.</p></div>}
+                                
+                                <div className="absolute inset-x-0 bottom-0 p-6 flex flex-col items-center pointer-events-none text-center h-1/2 justify-end">
+                                    <div className="space-y-2 drop-shadow-lg">
+                                        {showLangs.ko && activeIndices.ko !== -1 && tracks.ko[activeIndices.ko] && <div className="bg-black/60 backdrop-blur-sm text-white px-4 py-1.5 rounded-xl inline-block text-outline" style={{ fontSize: `${videoFontSize}px` }}>{tracks.ko[activeIndices.ko].text}</div>}
                                         {showLangs.zh && activeIndices.zh !== -1 && tracks.zh[activeIndices.zh] && (
                                             <div className="flex flex-col items-center">
-                                                {showPinyin && (
-                                                    <div className="bg-black/50 text-emerald-400 px-2 py-0.5 rounded-md mb-1 text-outline font-normal" style={{ fontSize: `${videoFontSize * 0.6}px` }}>
-                                                        {tracks.zh[activeIndices.zh].pinyin}
-                                                    </div>
-                                                )}
-                                                <div className="bg-black/60 backdrop-blur-sm text-white px-4 py-1.5 rounded-xl inline-block text-outline font-medium" style={{ fontSize: `${videoFontSize}px` }}>
-                                                    {tracks.zh[activeIndices.zh].text}
-                                                </div>
+                                                {showPinyin && <div className="bg-black/50 text-emerald-300 px-2 py-0.5 rounded-md mb-1 text-outline" style={{ fontSize: `${videoFontSize * 0.6}px` }}>{tracks.zh[activeIndices.zh].pinyin}</div>}
+                                                <div className="bg-black/60 backdrop-blur-sm text-white px-4 py-1.5 rounded-xl inline-block text-outline" style={{ fontSize: `${videoFontSize}px` }}>{tracks.zh[activeIndices.zh].text}</div>
                                             </div>
                                         )}
-                                        {showLangs.en && activeIndices.en !== -1 && tracks.en[activeIndices.en] && (
-                                            <div className="bg-black/60 backdrop-blur-sm text-white px-4 py-1.5 rounded-xl inline-block text-outline font-medium" style={{ fontSize: `${videoFontSize}px` }}>
-                                                {tracks.en[activeIndices.en].text}
-                                            </div>
-                                        )}
+                                        {showLangs.en && activeIndices.en !== -1 && tracks.en[activeIndices.en] && <div className="bg-black/60 backdrop-blur-sm text-white px-4 py-1.5 rounded-xl inline-block text-outline" style={{ fontSize: `${videoFontSize}px` }}>{tracks.en[activeIndices.en].text}</div>}
                                     </div>
                                 </div>
                             </div>
 
+                            {/* 컨트롤 패널 */}
                             <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-200 space-y-4">
                                 <div className="flex items-center gap-4">
-                                    <button onClick={togglePlay} className="w-12 h-12 rounded-2xl bg-[#1E6F54] text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform">
-                                        <Icon name={isPlaying ? "pause" : "play"} size={20} />
-                                    </button>
+                                    <button onClick={togglePlay} className="w-12 h-12 rounded-2xl bg-[#1E6F54] text-white flex items-center justify-center shadow-lg active:scale-90 transition-all"><Icon name={isPlaying ? "pause" : "play"} size={20} /></button>
                                     <div className="flex-1">
-                                        <div className="flex justify-between text-[10px] font-bold text-slate-400 mb-1 px-1">
-                                            <span>PLAYBACK STATUS</span>
-                                            <span className="font-mono">{Math.floor(currentTime)}s / {Math.floor(duration)}s</span>
-                                        </div>
-                                        <div 
-                                            className="h-2 bg-slate-100 rounded-full cursor-pointer relative overflow-hidden"
-                                            onClick={(e) => {
-                                                const r = e.currentTarget.getBoundingClientRect();
-                                                if (duration > 0) seekTo(((e.clientX - r.left) / r.width) * duration);
-                                            }}
-                                        >
-                                            <div className="h-full bg-[#1E6F54] transition-all" style={{ width: `${(currentTime / (duration || 1)) * 100}%` }} />
-                                            {loopA !== null && duration > 0 && <div className="absolute h-full w-0.5 bg-red-400" style={{ left: `${(loopA / duration) * 100}%` }} />}
-                                            {loopB !== null && duration > 0 && <div className="absolute h-full w-0.5 bg-red-400" style={{ left: `${(loopB / duration) * 100}%` }} />}
+                                        <div className="flex justify-between text-[10px] font-bold text-slate-400 mb-1 px-1"><span>STATUS</span><span className="font-mono">{Math.floor(currentTime)}s / {Math.floor(duration)}s</span></div>
+                                        <div className="h-2 bg-slate-100 rounded-full cursor-pointer relative overflow-hidden" onClick={e => { const r = e.currentTarget.getBoundingClientRect(); if(duration > 0) videoRef.current.currentTime = ((e.clientX-r.left)/r.width)*duration; }}>
+                                            <div className="h-full bg-[#1E6F54] transition-all" style={{ width: `${(currentTime/(duration||1))*100}%` }} />
+                                            {loopA !== null && <div className="absolute h-full w-0.5 bg-red-400" style={{ left: `${(loopA/duration)*100}%` }} />}
+                                            {loopB !== null && <div className="absolute h-full w-0.5 bg-red-400" style={{ left: `${(loopB/duration)*100}%` }} />}
                                         </div>
                                     </div>
                                 </div>
-
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t border-slate-100">
                                     <div className="space-y-4">
                                         <div className="space-y-2">
-                                            <label className="text-[11px] font-black text-slate-500 uppercase flex items-center gap-1.5"><Icon name="settings" size={12}/> 학습 배속</label>
+                                            <label className="text-[10px] font-black text-slate-500 uppercase flex items-center gap-1.5"><Icon name="settings" size={12}/> 학습 배속</label>
                                             <div className="flex p-1 bg-slate-100 rounded-xl">
-                                                {[0.8, 1.0, 1.2, 1.5].map(r => (
-                                                    <button key={r} onClick={() => { setPlaybackRate(r); if(videoRef.current) videoRef.current.playbackRate = r; }} className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${playbackRate === r ? 'bg-white shadow-sm text-[#1E6F54]' : 'text-slate-500'}`}>{r}x</button>
-                                                ))}
+                                                {[0.8, 1.0, 1.2, 1.5].map(r => <button key={r} onClick={() => { setPlaybackRate(r); if(videoRef.current) videoRef.current.playbackRate = r; }} className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all ${playbackRate === r ? 'bg-white shadow-sm text-[#1E6F54]' : 'text-slate-500'}`}>{r}x</button>)}
                                             </div>
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-[11px] font-black text-slate-500 uppercase flex items-center gap-1.5">구간 반복 (A-B)</label>
+                                            <label className="text-[10px] font-black text-slate-500 uppercase">구간 반복 (A-B)</label>
                                             <div className="flex gap-2">
-                                                <button onClick={() => setLoopA(currentTime)} className={`flex-1 py-2 text-[11px] font-bold rounded-xl border transition-all ${loopA !== null ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-white text-slate-400 border-slate-200'}`}>{loopA !== null ? `A: ${Math.floor(loopA)}s` : '시작점A'}</button>
-                                                <button onClick={() => setLoopB(currentTime)} className={`flex-1 py-2 text-[11px] font-bold rounded-xl border transition-all ${loopB !== null ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-white text-slate-400 border-slate-200'}`}>{loopB !== null ? `B: ${Math.floor(loopB)}s` : '끝점B'}</button>
-                                                <button onClick={() => setIsLooping(!isLooping)} disabled={loopA === null || loopB === null} className={`flex-1 py-2 text-[11px] font-bold rounded-xl transition-all ${isLooping ? 'bg-[#1E6F54] text-white shadow-md' : 'bg-slate-200 text-slate-400'}`}>반복 ON</button>
+                                                <button onClick={() => setLoopA(currentTime)} className={`flex-1 py-2 text-[10px] font-bold rounded-xl border transition-all ${loopA !== null ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-white text-slate-400 border-slate-200'}`}>{loopA !== null ? `A:${Math.floor(loopA)}s` : 'A설정'}</button>
+                                                <button onClick={() => setLoopB(currentTime)} className={`flex-1 py-2 text-[10px] font-bold rounded-xl border transition-all ${loopB !== null ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-white text-slate-400 border-slate-200'}`}>{loopB !== null ? `B:${Math.floor(loopB)}s` : 'B설정'}</button>
+                                                <button onClick={() => setIsLooping(!isLooping)} disabled={loopA === null || loopB === null} className={`flex-1 py-2 text-[10px] font-bold rounded-xl transition-all ${isLooping ? 'bg-[#1E6F54] text-white shadow-md' : 'bg-slate-200 text-slate-400'}`}>반복ON</button>
                                             </div>
                                         </div>
                                     </div>
-
                                     <div className="space-y-4">
                                         <div className="space-y-2">
-                                            <label className="text-[11px] font-black text-slate-500 uppercase">자막 표시 여부</label>
+                                            <label className="text-[10px] font-black text-slate-500 uppercase">자막 설정</label>
                                             <div className="flex gap-2">
-                                                {['ko', 'zh', 'en'].map(l => (
-                                                    <button key={l} onClick={() => setShowLangs(prev => ({...prev, [l]: !prev[l]}))} className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border ${showLangs[l] ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-200'}`}>{l.toUpperCase()}</button>
-                                                ))}
+                                                {['ko', 'zh', 'en'].map(l => <button key={l} onClick={() => setShowLangs(p => ({...p, [l]: !p[l]}))} className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border ${showLangs[l] ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-200'}`}>{l.toUpperCase()}</button>)}
                                             </div>
                                         </div>
                                         <div className="space-y-2">
-                                            <div className="flex justify-between items-center">
-                                                <label className="text-[11px] font-black text-slate-500 uppercase">영상 자막 크기</label>
-                                                <span className="text-xs font-mono text-emerald-700">{videoFontSize}px</span>
-                                            </div>
-                                            <input type="range" min="14" max="40" value={videoFontSize} onChange={(e) => setVideoFontSize(parseInt(e.target.value))} className="w-full" />
+                                            <div className="flex justify-between items-center"><label className="text-[10px] font-black text-slate-500 uppercase">자막 크기</label><span className="text-xs font-mono text-emerald-700">{videoFontSize}px</span></div>
+                                            <input type="range" min="14" max="40" value={videoFontSize} onChange={e => setVideoFontSize(parseInt(e.target.value))} className="w-full" />
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* 오른쪽: 스크립트 사이드바 */}
+                        {/* 오른쪽: 스크립트 */}
                         <div className="w-full lg:w-[450px] bg-white rounded-3xl border border-slate-200 flex flex-col shadow-sm overflow-hidden min-h-[500px] lg:h-auto">
                             <div className="p-5 border-b space-y-4 bg-slate-50/50">
-                                <div className="flex items-center justify-between">
-                                    <h3 className="font-black text-base flex items-center gap-2 text-slate-800"><Icon name="search" size={18} className="text-[#1E6F54]" /> 스크립트 학습</h3>
-                                    <div className="flex bg-white rounded-lg p-0.5 border border-slate-200">
-                                        {['ko','zh','en'].map(l => (
-                                            <button key={l} onClick={() => setAnchorLang(l)} className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${anchorLang === l ? 'bg-[#1E6F54] text-white' : 'text-slate-400'}`}>{l.toUpperCase()}</button>
-                                        ))}
-                                    </div>
-                                </div>
-                                
-                                <div className="relative group">
-                                    <Icon name="search" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                    <input 
-                                        type="text" 
-                                        placeholder="스크립트 내용 검색..."
-                                        className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                    />
-                                </div>
-
-                                <div className="flex items-center justify-between px-1">
-                                    <label className="flex items-center gap-2 cursor-pointer group">
-                                        <div className={`w-8 h-4 rounded-full relative transition-colors ${showPinyin ? 'bg-[#1E6F54]' : 'bg-slate-300'}`}>
-                                            <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform ${showPinyin ? 'translate-x-4' : ''}`} />
-                                        </div>
-                                        <span className="text-xs font-bold text-slate-500 group-hover:text-slate-700">중국어 병음</span>
-                                        <input type="checkbox" className="hidden" checked={showPinyin} onChange={e => setShowPinyin(e.target.checked)} />
-                                    </label>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[10px] font-bold text-slate-400">글자 크기</span>
-                                        <input type="range" min="12" max="24" value={scriptFontSize} onChange={e => setScriptFontSize(parseInt(e.target.value))} className="w-16 h-1" />
-                                    </div>
-                                </div>
+                                <div className="flex items-center justify-between"><h3 className="font-black text-base flex items-center gap-2 text-slate-800"><Icon name="search" size={18} className="text-[#1E6F54]" /> 스크립트</h3><div className="flex bg-white rounded-lg p-0.5 border border-slate-200">{['ko','zh','en'].map(l => <button key={l} onClick={() => setAnchorLang(l)} className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${anchorLang === l ? 'bg-[#1E6F54] text-white' : 'text-slate-400'}`}>{l.toUpperCase()}</button>)}</div></div>
+                                <div className="relative group"><Icon name="search" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input type="text" placeholder="스크립트 검색..." className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500/20" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
                             </div>
 
                             <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-                                {filteredList.length > 0 ? filteredList.map((item, idx) => {
-                                    const isActive = (anchorLang === 'ko' && activeIndices.ko === idx) || 
-                                                     (anchorLang === 'zh' && activeIndices.zh === idx) || 
-                                                     (anchorLang === 'en' && activeIndices.en === idx);
+                                {filteredList.map((item, idx) => {
+                                    const isActive = (anchorLang === 'ko' && activeIndices.ko === idx) || (anchorLang === 'zh' && activeIndices.zh === idx) || (anchorLang === 'en' && activeIndices.en === idx);
                                     return (
-                                        <div 
-                                            key={idx}
-                                            ref={el => itemRefs.current[idx] = el}
-                                            onClick={() => seekTo(item.start)}
-                                            className={`p-4 rounded-2xl cursor-pointer border transition-all relative group ${isActive ? 'bg-emerald-50/50 border-emerald-500/30' : 'bg-white border-slate-100 hover:border-emerald-100'}`}
-                                        >
-                                            <div className="flex justify-between items-center mb-2">
-                                                <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${isActive ? 'bg-[#1E6F54] text-white' : 'bg-slate-100 text-slate-400'}`}>
-                                                    {Math.floor(item.start)}s
-                                                </span>
-                                                <button 
-                                                    onClick={(e) => { e.stopPropagation(); openDict(item[anchorLang]); }}
-                                                    className="opacity-0 group-hover:opacity-100 text-[#1E6F54] text-[10px] font-bold flex items-center gap-1 transition-opacity"
-                                                >
-                                                    <Icon name="external" size={10} /> 사전 검색
-                                                </button>
-                                            </div>
+                                        <div key={idx} ref={el => itemRefs.current[idx] = el} onClick={() => { videoRef.current.currentTime = item.start; videoRef.current.play(); setIsPlaying(true); }} className={`p-4 rounded-2xl cursor-pointer border transition-all relative group ${isActive ? 'bg-emerald-50 border-emerald-500/30 shadow-sm' : 'bg-white border-slate-100 hover:border-emerald-100'}`}>
+                                            <div className="flex justify-between items-center mb-2"><span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${isActive ? 'bg-[#1E6F54] text-white' : 'bg-slate-100 text-slate-400'}`}>{Math.floor(item.start)}s</span><button onClick={e => { e.stopPropagation(); window.open(`https://dict.naver.com/search.nhn?query=${encodeURIComponent(item[anchorLang])}`, '_blank'); }} className="opacity-0 group-hover:opacity-100 text-[#1E6F54] text-[10px] font-bold flex items-center gap-1 transition-opacity"><Icon name="external" size={10} /> 사전</button></div>
                                             <div className="space-y-2.5">
-                                                {showLangs.ko && item.ko && (
-                                                    <p className="leading-snug text-slate-800" style={{ fontSize: `${scriptFontSize}px` }}>
-                                                        {highlightSearch(item.ko)}
-                                                    </p>
-                                                )}
+                                                {showLangs.ko && item.ko && <p className="leading-snug text-slate-800" style={{ fontSize: `${scriptFontSize}px` }}>{item.ko}</p>}
                                                 {showLangs.zh && item.zh && (
                                                     <div className="space-y-1">
-                                                        {showPinyin && item.pinyin && <p className="text-emerald-600 font-normal leading-none" style={{ fontSize: `${scriptFontSize * 0.75}px` }}>{highlightSearch(item.pinyin)}</p>}
-                                                        <p className="leading-snug text-slate-800" style={{ fontSize: `${scriptFontSize}px` }}>{highlightSearch(item.zh)}</p>
+                                                        {showPinyin && item.pinyin && <p className="text-emerald-600 leading-none" style={{ fontSize: `${scriptFontSize * 0.75}px` }}>{item.pinyin}</p>}
+                                                        <p className="leading-snug text-slate-800" style={{ fontSize: `${scriptFontSize}px` }}>{item.zh}</p>
                                                     </div>
                                                 )}
-                                                {showLangs.en && item.en && (
-                                                    <p className="leading-snug text-slate-500" style={{ fontSize: `${scriptFontSize * 0.95}px` }}>
-                                                        {highlightSearch(item.en)}
-                                                    </p>
-                                                )}
+                                                {showLangs.en && item.en && <p className="leading-snug text-slate-500" style={{ fontSize: `${scriptFontSize * 0.95}px` }}>{item.en}</p>}
                                             </div>
                                         </div>
                                     );
-                                }) : (
-                                    <div className="flex flex-col items-center justify-center py-20 text-slate-300 italic text-sm">
-                                        <Icon name="info" size={32} className="mb-2 opacity-20" />
-                                        검색 결과가 없습니다.
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="p-4 bg-slate-50 border-t flex items-center gap-3">
-                                <Icon name="info" size={14} className="text-slate-400 shrink-0" />
-                                <p className="text-[10px] text-slate-500 leading-tight">문장을 클릭하여 이동하고, 단어를 드래그하여 바로 학습하세요.</p>
+                                })}
                             </div>
                         </div>
                     </main>
 
-                    <footer className="h-8 bg-white border-t flex items-center justify-between px-6 shrink-0 text-[10px] font-bold text-slate-300 uppercase tracking-widest">
-                        <span>JW MULTIPLE PLAYER PRO V2.2</span>
-                        <span>DESIGNED FOR LEARNING SEAMLESSLY</span>
+                    <footer className="h-8 bg-white border-t flex items-center justify-between px-6 shrink-0 text-[9px] font-bold text-slate-300 uppercase tracking-widest">
+                        <span>JW MULTIPLE PLAYER ARCHIVE V3.0</span>
+                        <span>DESIGNED FOR COLLECTORS</span>
                     </footer>
                 </div>
             );
         };
 
-            const root = ReactDOM.createRoot(document.getElementById('root'));
-            root.render(<App />);
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
     </script>
 </body>
 </html>

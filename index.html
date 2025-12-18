@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JW Multiple Player Pro</title>
+    <title>JW Multiple Player Pro - 클리핑 에디션</title>
     <!-- React 및 필수 라이브러리 CDN -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -21,7 +21,7 @@
         
         mark { color: inherit; border-radius: 2px; }
 
-        /* 슬라이더 스타일 커스텀 */
+        /* 슬라이더 스타일 */
         input[type=range] { -webkit-appearance: none; background: transparent; }
         input[type=range]:focus { outline: none; }
         input[type=range]::-webkit-slider-thumb {
@@ -42,25 +42,25 @@
             border-radius: 2px;
         }
 
-        /* 모달 애니메이션 */
-        .modal-overlay {
-            background-color: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(4px);
+        /* 애니메이션 */
+        .dict-popup { animation: fadeInScale 0.15s ease-out; z-index: 1000; }
+        @keyframes fadeInScale {
+            from { opacity: 0; transform: scale(0.9) translateY(5px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
         }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: scale(0.95); }
-            to { opacity: 1; transform: scale(1); }
-        }
-        .animate-modal { animation: fadeIn 0.2s ease-out; }
 
-        /* 모바일 스티키 비디오 레이아웃 */
+        .loading-spinner {
+            border: 3px solid rgba(30, 111, 84, 0.1);
+            border-top: 3px solid #1E6F54;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
         @media (max-width: 1023px) {
-            .sticky-video-container {
-                position: sticky;
-                top: 60px;
-                z-index: 40;
-            }
+            .sticky-video-container { position: sticky; top: 60px; z-index: 40; }
         }
     </style>
 </head>
@@ -70,20 +70,28 @@
     <script type="text/babel">
         const { useState, useRef, useEffect, useMemo } = React;
 
+        const apiKey = ""; // API Key는 환경에서 자동 제공됨
+
         const Icon = ({ name, size = 20, className = "" }) => {
             const icons = {
                 play: <polygon points="5 3 19 12 5 21 5 3"></polygon>,
                 pause: <><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></>,
                 sun: <><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></>,
                 moon: <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>,
-                settings: <><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></>,
                 search: <><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></>,
                 list: <><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></>,
                 anchor: <path d="M12 22v-5m0-10V2m0 5a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5z"></path>,
-                x: <line x1="18" y1="6" x2="6" y2="18"></line>,
                 sliders: <><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="2" y1="14" x2="6" y2="14"></line><line x1="10" y1="8" x2="14" y2="8"></line><line x1="18" y1="16" x2="22" y2="16"></line></>,
                 mouse: <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z M13 13l6 6"></path>,
                 type: <><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="12" y1="4" x2="12" y2="20"></line><line x1="9" y1="20" x2="15" y2="20"></line></>,
+                external: <><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></>,
+                info: <><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></>,
+                chevronDown: <polyline points="6 9 12 15 18 9"></polyline>,
+                chevronUp: <polyline points="18 15 12 9 6 15"></polyline>,
+                alert: <><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></>,
+                video: <><path d="m22 8-6 4 6 4V8Z"></path><rect width="14" height="12" x="2" y="6" rx="2" ry="2"></rect></>,
+                globe: <><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></>,
+                help: <><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></>
             };
             return (
                 <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -99,6 +107,8 @@
             const [duration, setDuration] = useState(0);
             const [isPlaying, setIsPlaying] = useState(false);
             const [playbackRate, setPlaybackRate] = useState(1.0); 
+            const [isClipping, setIsClipping] = useState(false);
+            const [showHelp, setShowHelp] = useState(false);
             
             const [activeIdxKo, setActiveIdxKo] = useState(-1);
             const [activeIdxEn, setActiveIdxEn] = useState(-1);
@@ -110,7 +120,7 @@
             const [showEn, setShowEn] = useState(true);
             const [showPinyin, setShowPinyin] = useState(true);
             const [isDarkMode, setIsDarkMode] = useState(false);
-            const [showGlobalSettings, setShowGlobalSettings] = useState(false);
+            const [showVideoFontSettings, setShowVideoFontSettings] = useState(false);
             const [clickBehavior, setClickBehavior] = useState('play'); 
             const [searchTerm, setSearchTerm] = useState("");
             
@@ -126,25 +136,76 @@
             const [loopB, setLoopB] = useState(null);
             const [isLooping, setIsLooping] = useState(false);
 
+            const [dictPopup, setDictPopup] = useState({ show: false, x: 0, y: 0, text: "" });
+
             const videoRef = useRef(null);
             const scrollRef = useRef(null);
 
-            const multiTracks = {
+            // 초기 샘플 데이터
+            const [tracks, setTracks] = useState({
                 ko: [
-                    { start: 0, end: 5, text: "안녕하세요! JW Multiple Player 테스트 영상입니다." },
-                    { start: 5.1, end: 10, text: "이제 실시간으로 여러 자막을 동시에 확인할 수 있습니다." },
-                    { start: 38.6, end: 44.1, text: "성경 사도행전 11장을 펴서 초기 회중의 역사를 보시죠." }
+                    { start: 0, end: 5, text: "안녕하세요! JW Multiple Player 클리핑 시스템입니다." },
+                    { start: 5.1, end: 10, text: "JW.org 영상 링크를 복사해 넣으면 자동으로 데이터를 추출합니다." },
+                    { start: 10.1, end: 15, text: "상단 도움말 아이콘을 눌러 지원되는 링크 형식을 확인해보세요." }
                 ],
                 zh: [
-                    { start: 0, end: 5, text: "你好！ 这是 JW Multiple Player 测试视频。", pinyin: "Nǐ hǎo! Zhè shì JW Multiple Player cèshì shìpín." },
-                    { start: 5.1, end: 10, text: "现在您可以同时查看多个字幕。", pinyin: "Xiànzài nín kěyǐ tóngshí chákàn duō gè zìmù." },
-                    { start: 38.5, end: 44.2, text: "请翻开圣经 使徒行传11章, 这里记录了会众早期的历史,", pinyin: "Qǐng fānkāi Shèngjīng Shǐtú Xíngzhuàn 11 zhāng..." }
+                    { start: 0, end: 5, text: "你好！ 欢迎使用 JW Multiple Player 剪辑系统。", pinyin: "Nǐ hǎo! Huānyíng shǐyòng JW Multiple Player jiǎnjié xìtǒng." },
+                    { start: 5.1, end: 10, text: "只需复制 JW.org 视频链接，系统即可自动提取数据。", pinyin: "Zhǐ xū fùzhì JW.org shìpín liànjiē, xìtǒng jíkě zìdòng tíqǔ shùjù." },
+                    { start: 10.1, end: 15, text: "点击顶部的帮助图标以查看支持的链接格式。", pinyin: "Diǎnjī dǐngbù de bāngzhù túbiāo yǐ chákàn zhīchí de liànjiē géshì." }
                 ],
                 en: [
-                    { start: 0, end: 5, text: "Hello! This is a test video for JW Multiple Player." },
-                    { start: 5.1, end: 10, text: "Now you can check multiple subtitles simultaneously." },
-                    { start: 38.4, end: 44.3, text: "Well, let’s open our Bibles to Acts chapter 11." }
+                    { start: 0, end: 5, text: "Hello! Welcome to the JW Multiple Player Clipping System." },
+                    { start: 5.1, end: 10, text: "Copy and paste a JW.org video link to automatically extract data." },
+                    { start: 10.1, end: 15, text: "Click the help icon at the top to check supported link formats." }
                 ]
+            });
+
+            // 웹 클리핑 핵심 로직 (Gemini 2.5 Flash 활용)
+            const handleClipVideo = async () => {
+                if (!inputUrl.trim()) return;
+                
+                // 1. 단순 MP4 링크인 경우 바로 처리
+                if (inputUrl.toLowerCase().endsWith(".mp4")) {
+                    setVideoUrl(inputUrl);
+                    return;
+                }
+
+                setIsClipping(true);
+                try {
+                    // Gemini API를 사용하여 JW.org 페이지 분석 및 미디어 소스 추출
+                    const prompt = `Analyze this JW.org video link: "${inputUrl}". 
+                    1. Find the highest quality direct MP4 video URL available on this page or via common JW finder patterns.
+                    2. Extract the transcript or subtitles for this video in Korean (ko), Chinese (zh), and English (en).
+                    3. Format each track as an array of objects: { start: number (seconds), end: number (seconds), text: string, pinyin: string (for zh only) }.
+                    4. Return ONLY a valid JSON object: { "videoUrl": "string", "tracks": { "ko": [], "zh": [], "en": [] } }.
+                    Ensure the timestamps are as accurate as possible. If some languages are missing, provide at least the primary one.`;
+
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: prompt }] }],
+                            tools: [{ "google_search": {} }],
+                            generationConfig: { responseMimeType: "application/json" }
+                        })
+                    });
+
+                    if (!response.ok) throw new Error("분석 실패");
+                    const result = await response.json();
+                    const data = JSON.parse(result.candidates?.[0]?.content?.parts?.[0]?.text || "{}");
+
+                    if (data.videoUrl) {
+                        setVideoUrl(data.videoUrl);
+                        if (data.tracks) setTracks(data.tracks);
+                    } else {
+                        throw new Error("영상 소스를 찾을 수 없습니다.");
+                    }
+                } catch (err) {
+                    console.error("Clipping Error:", err);
+                    alert("영상 데이터를 추출하는 데 실패했습니다. 올바른 주소인지 확인해주세요.");
+                } finally {
+                    setIsClipping(false);
+                }
             };
 
             const togglePlay = () => {
@@ -158,9 +219,9 @@
                 const time = videoRef.current.currentTime;
                 setCurrentTime(time);
                 if (isLooping && loopA !== null && loopB !== null && time >= loopB) { videoRef.current.currentTime = loopA; }
-                setActiveIdxKo(multiTracks.ko.findIndex(it => time >= it.start && time < it.end));
-                setActiveIdxEn(multiTracks.en.findIndex(it => time >= it.start && time < it.end));
-                setActiveIdxZh(multiTracks.zh.findIndex(it => time >= it.start && time < it.end));
+                setActiveIdxKo(tracks.ko.findIndex(it => time >= it.start && time < it.end));
+                setActiveIdxEn(tracks.en.findIndex(it => time >= it.start && time < it.end));
+                setActiveIdxZh(tracks.zh.findIndex(it => time >= it.start && time < it.end));
             };
 
             const handleRateChange = (rate) => {
@@ -175,20 +236,42 @@
                 else { videoRef.current.pause(); setIsPlaying(false); }
             };
 
+            const handleMouseUp = () => {
+                const selection = window.getSelection();
+                const text = selection.toString().trim();
+                if (text && text.length > 0) {
+                    const range = selection.getRangeAt(0);
+                    const rect = range.getBoundingClientRect();
+                    setDictPopup({ show: true, x: rect.left + window.scrollX, y: rect.top + window.scrollY - 55, text: text });
+                }
+            };
+
+            useEffect(() => {
+                const handleClickOutside = () => setDictPopup(prev => ({ ...prev, show: false }));
+                document.addEventListener('mousedown', handleClickOutside);
+                return () => document.removeEventListener('mousedown', handleClickOutside);
+            }, []);
+
+            const openDictionary = (text) => {
+                const url = `https://dict.naver.com/search.nhn?query=${encodeURIComponent(text)}`;
+                window.open(url, '_blank', 'width=1000,height=800');
+                setDictPopup(prev => ({ ...prev, show: false }));
+            };
+
             const highlightText = (text, queries) => {
                 if (!queries || queries.length === 0 || !text) return text;
                 const pattern = queries.map(q => q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
                 const parts = text.split(new RegExp(`(${pattern})`, 'gi'));
                 return parts.map((part, i) => 
                     queries.some(q => q.toLowerCase() === part.toLowerCase()) ? 
-                    <mark key={i} className="bg-emerald-100 dark:bg-emerald-900/50 text-emerald-900 dark:text-emerald-100 rounded-sm px-0.5 font-bold transition-colors">{part}</mark> : part
+                    <mark key={i} className="bg-emerald-100 dark:bg-emerald-900/50 text-emerald-900 dark:text-emerald-100 rounded-sm px-0.5 font-bold">{part}</mark> : part
                 );
             };
 
             const searchWords = useMemo(() => searchTerm.trim().split(/\s+/).filter(w => w.length > 0), [searchTerm]);
 
             const anchorList = useMemo(() => {
-                const leadTrack = multiTracks[anchorLang];
+                const leadTrack = tracks[anchorLang];
                 return leadTrack.map((leadItem, idx) => {
                     const midTime = (leadItem.start + leadItem.end) / 2;
                     const findMatched = (track) => track.find(it => midTime >= it.start && midTime < it.end) || track.find(it => leadItem.start >= it.start && leadItem.start < it.end);
@@ -196,13 +279,13 @@
                         id: idx,
                         start: leadItem.start,
                         end: leadItem.end,
-                        ko: anchorLang === 'ko' ? leadItem.text : findMatched(multiTracks.ko)?.text || "",
-                        zh: anchorLang === 'zh' ? leadItem.text : findMatched(multiTracks.zh)?.text || "",
-                        pinyin: anchorLang === 'zh' ? leadItem.pinyin : findMatched(multiTracks.zh)?.pinyin || "",
-                        en: anchorLang === 'en' ? leadItem.text : findMatched(multiTracks.en)?.text || ""
+                        ko: anchorLang === 'ko' ? leadItem.text : findMatched(tracks.ko)?.text || "",
+                        zh: anchorLang === 'zh' ? leadItem.text : findMatched(tracks.zh)?.text || "",
+                        pinyin: anchorLang === 'zh' ? leadItem.pinyin : findMatched(tracks.zh)?.pinyin || "",
+                        en: anchorLang === 'en' ? leadItem.text : findMatched(tracks.en)?.text || ""
                     };
                 });
-            }, [anchorLang]);
+            }, [anchorLang, tracks]);
 
             const filteredList = useMemo(() => {
                 if (searchWords.length === 0) return anchorList;
@@ -226,69 +309,82 @@
             const accentText = isDarkMode ? "text-[#34a87e]" : "text-[#1E6F54]";
 
             return (
-                <div className={`min-h-screen font-sans flex flex-col ${themeClass}`}>
+                <div className={`min-h-screen font-sans flex flex-col relative overflow-x-hidden ${themeClass}`}>
                     
-                    {/* --- GLOBAL HEADER --- */}
+                    {/* 상단 헤더 */}
                     <nav className={`h-[60px] border-b px-4 lg:px-8 flex items-center justify-between sticky top-0 backdrop-blur-xl z-50 ${isDarkMode ? 'bg-slate-950/80 border-white/5' : 'bg-white/80 border-slate-200 shadow-sm'}`}>
                         <div className="flex items-center gap-4">
-                            <div className={`w-9 h-9 ${buttonAccent} rounded-xl flex items-center justify-center font-black text-white`}>MP</div>
+                            <div className={`w-9 h-9 ${buttonAccent} rounded-xl flex items-center justify-center font-black text-white shadow-lg`}>MP</div>
                             <h1 className={`font-black text-sm lg:text-base ${accentText} leading-none uppercase tracking-tighter`}>JW Player Pro</h1>
                         </div>
                         
-                        <div className="flex items-center gap-2 lg:gap-4 flex-1 max-w-lg mx-4">
+                        <div className="flex items-center gap-2 flex-1 max-w-xl mx-4 relative">
                             <div className="relative w-full">
-                                <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                                <input type="text" placeholder="URL 입력..." className={`w-full pl-9 pr-4 py-2 rounded-xl border text-xs outline-none ${isDarkMode ? 'bg-slate-900 border-white/5' : 'bg-slate-50 border-slate-200'}`} value={inputUrl} onChange={(e) => setInputUrl(e.target.value)} />
+                                <Icon name="globe" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                                <input type="text" placeholder="동영상 페이지 또는 공유 링크 입력..." className={`w-full pl-9 pr-10 py-2.5 rounded-xl border text-xs outline-none transition-all focus:ring-2 focus:ring-emerald-500/20 ${isDarkMode ? 'bg-slate-900 border-white/5 text-white' : 'bg-white border-slate-200 shadow-inner'}`} value={inputUrl} onChange={(e) => setInputUrl(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleClipVideo()} />
+                                <button onClick={() => setShowHelp(!showHelp)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-emerald-500 transition-colors">
+                                    <Icon name="help" size={16} />
+                                </button>
                             </div>
-                            <button onClick={() => setVideoUrl(inputUrl)} className={`px-4 py-2 ${buttonAccent} text-white text-[10px] font-bold rounded-xl shrink-0`}>로드</button>
+                            <button onClick={handleClipVideo} disabled={isClipping} className={`px-5 py-2.5 ${buttonAccent} text-white text-[10px] font-bold rounded-xl shrink-0 transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50`}>
+                                {isClipping ? <div className="loading-spinner"></div> : "웹 클리핑"}
+                            </button>
+
+                            {/* 도움말 툴팁 */}
+                            {showHelp && (
+                                <div className={`absolute top-[110%] left-0 w-full p-5 rounded-2xl border shadow-2xl animate-modal z-[100] ${isDarkMode ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200'}`}>
+                                    <div className="flex justify-between items-center mb-3">
+                                        <h4 className="text-[11px] font-black uppercase tracking-widest text-emerald-600">지원되는 링크 예시</h4>
+                                        <button onClick={() => setShowHelp(false)}><Icon name="x" size={14} /></button>
+                                    </div>
+                                    <ul className="text-[10px] space-y-2 opacity-70 break-all leading-relaxed">
+                                        <li>• jw.org/ko/라이브러리/videos/... (영상 페이지)</li>
+                                        <li>• jw.org/finder?locale=ko&item=... (공유 링크)</li>
+                                        <li>• jw.org/finder?srcid=jwlshare&... (JWL 공유)</li>
+                                        <li>• download-a.akamaihd.net/../pub-co...mp4 (직접 링크)</li>
+                                    </ul>
+                                </div>
+                            )}
                         </div>
 
-                        <div className="flex items-center gap-2">
-                            <button onClick={() => setShowGlobalSettings(true)} className={`p-2 rounded-xl border ${isDarkMode ? 'bg-slate-900 text-slate-400' : 'bg-white text-slate-500 shadow-sm'}`}>
-                                <Icon name="settings" size={20} />
-                            </button>
-                            <button onClick={() => setIsDarkMode(!isDarkMode)} className={`p-2 rounded-xl border ${isDarkMode ? 'bg-slate-900 text-yellow-500' : 'bg-white text-slate-500 shadow-sm'}`}>
-                                <Icon name={isDarkMode ? "sun" : "moon"} size={20} />
-                            </button>
-                        </div>
+                        <button onClick={() => setIsDarkMode(!isDarkMode)} className={`p-2 rounded-xl border transition-all ${isDarkMode ? 'bg-slate-900 border-white/10 text-yellow-500' : 'bg-white border-slate-200 text-slate-500 shadow-sm'}`}>
+                            <Icon name={isDarkMode ? "sun" : "moon"} size={20} />
+                        </button>
                     </nav>
 
-                    {/* --- MAIN CONTENT: 6:4 Ratio --- */}
-                    <main className="max-w-[1600px] mx-auto p-4 lg:p-8 grid grid-cols-1 lg:grid-cols-10 gap-6 lg:gap-10 flex-1 w-full overflow-hidden">
+                    {/* 메인 콘텐츠 (6:4) */}
+                    <main className="max-w-[1600px] mx-auto p-4 lg:p-8 grid grid-cols-1 lg:grid-cols-10 gap-6 lg:gap-8 flex-1 w-full overflow-hidden">
                         
-                        {/* --- LEFT: VIDEO AREA (6) --- */}
+                        {/* 왼쪽 섹션: 영상 및 컨트롤러 (6) */}
                         <div className="lg:col-span-6 flex flex-col gap-6 sticky-video-container">
-                            {/* Video Container (Photo 1 Style) */}
-                            <div className={`aspect-video rounded-[2rem] lg:rounded-[3rem] overflow-hidden shadow-2xl relative border-4 ${isDarkMode ? 'bg-black border-slate-900' : 'bg-white border-white'}`}>
+                            <div className={`aspect-video rounded-[2.5rem] lg:rounded-[3.5rem] overflow-hidden shadow-2xl relative border-4 ${isDarkMode ? 'bg-black border-slate-900' : 'bg-white border-white'}`}>
                                 <video key={videoUrl} ref={videoRef} onClick={togglePlay} className="w-full h-full object-contain cursor-pointer" onTimeUpdate={handleTimeUpdate} onLoadedMetadata={(e) => setDuration(e.target.duration)} playsInline>
                                     <source src={videoUrl} type="video/mp4" />
                                 </video>
                                 
-                                {/* Subtitle Overlay */}
-                                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent p-6 lg:p-12 text-center pointer-events-none flex flex-col items-center justify-end min-h-[50%]">
+                                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/10 to-transparent p-6 lg:p-12 text-center pointer-events-none flex flex-col items-center justify-end min-h-[50%]">
                                     <div className="space-y-2 flex flex-col items-center w-full">
-                                        {showKo && activeIdxKo !== -1 && <p className="font-black text-white drop-shadow-[0_4px_4px_rgba(0,0,0,1)]" style={{ fontSize: `${fontSizeKo}px` }}>{multiTracks.ko[activeIdxKo].text}</p>}
+                                        {showKo && activeIdxKo !== -1 && <p className="font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,1)]" style={{ fontSize: `${fontSizeKo}px` }}>{tracks.ko[activeIdxKo].text}</p>}
                                         {showZh && activeIdxZh !== -1 && (
                                             <div className="flex flex-col items-center">
-                                                {showPinyin && <span className="px-3 py-1 mb-2 bg-emerald-600/70 text-emerald-50 font-mono rounded-lg shadow-xl text-sm" style={{ fontSize: `${fontSizeZh * 0.6}px` }}>{multiTracks.zh[activeIdxZh].pinyin}</span>}
-                                                <p className="text-emerald-300 font-bold drop-shadow-[0_4px_4px_rgba(0,0,0,1)]" style={{ fontSize: `${fontSizeZh}px` }}>{multiTracks.zh[activeIdxZh].text}</p>
+                                                {showPinyin && <span className="px-3 py-1 mb-2 bg-emerald-600/70 text-emerald-50 font-mono rounded-lg shadow-xl" style={{ fontSize: `${fontSizeZh * 0.55}px` }}>{tracks.zh[activeIdxZh].pinyin}</span>}
+                                                <p className="text-emerald-300 font-bold drop-shadow-[0_2px_4px_rgba(0,0,0,1)]" style={{ fontSize: `${fontSizeZh}px` }}>{tracks.zh[activeIdxZh].text}</p>
                                             </div>
                                         )}
-                                        {showEn && activeIdxEn !== -1 && <p className="text-slate-200 font-medium drop-shadow-[0_4px_4px_rgba(0,0,0,1)]" style={{ fontSize: `${fontSizeEn}px` }}>{multiTracks.en[activeIdxEn].text}</p>}
+                                        {showEn && activeIdxEn !== -1 && <p className="text-slate-200 font-medium drop-shadow-[0_2px_4px_rgba(0,0,0,1)]" style={{ fontSize: `${fontSizeEn}px` }}>{tracks.en[activeIdxEn].text}</p>}
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Internal Playback Controls (Photo 2 Style) */}
-                            <div className={`p-6 rounded-[2.5rem] border-2 flex flex-col gap-6 ${cardClass}`}>
+                            <div className={`p-6 lg:p-8 rounded-[3rem] border-2 flex flex-col gap-8 ${cardClass}`}>
                                 <div className="flex items-center gap-6">
-                                    <button onClick={togglePlay} className={`w-16 h-16 ${buttonAccent} text-white rounded-[1.5rem] flex items-center justify-center shadow-lg shrink-0 transition-transform active:scale-95`}>
+                                    <button onClick={togglePlay} className={`w-16 h-16 ${buttonAccent} text-white rounded-[1.8rem] flex items-center justify-center shadow-lg shrink-0 transition-all active:scale-90`}>
                                         <Icon name={isPlaying ? "pause" : "play"} size={32} />
                                     </button>
                                     <div className="flex-1">
                                         <div className="flex justify-between items-end mb-2">
-                                            <span className="text-[10px] font-black uppercase tracking-widest opacity-40">Playing Now</span>
-                                            <span className="text-xs font-mono font-bold opacity-60">{Math.floor(currentTime)}s / {Math.floor(duration)}s</span>
+                                            <span className="text-[10px] font-black uppercase tracking-widest opacity-40">현재 재생 위치</span>
+                                            <span className="text-xs font-mono font-bold opacity-60">{Math.floor(currentTime)}초 / {Math.floor(duration)}초</span>
                                         </div>
                                         <div className={`h-3 rounded-full relative overflow-hidden cursor-pointer ${isDarkMode ? 'bg-white/10' : 'bg-slate-100 shadow-inner'}`} onClick={(e) => {
                                             const rect = e.currentTarget.getBoundingClientRect();
@@ -299,61 +395,126 @@
                                     </div>
                                 </div>
 
-                                {/* Stacked Controls: Speed & Loop */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-3">
-                                        <div className="flex justify-between text-[10px] font-black uppercase opacity-40">Speed <span className="text-emerald-600">{playbackRate}x</span></div>
-                                        <div className={`flex p-1 rounded-xl border ${isDarkMode ? 'bg-slate-950 border-white/5' : 'bg-slate-50 border-slate-200'}`}>
-                                            {[0.8, 1.0, 1.2, 1.5].map(rate => (
-                                                <button key={rate} onClick={() => handleRateChange(rate)} className={`flex-1 py-2 rounded-lg text-xs font-black transition-all ${playbackRate === rate ? 'bg-[#1E6F54] text-white shadow-md' : 'text-slate-400 hover:text-emerald-600'}`}>{rate}x</button>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
+                                    <div className="space-y-6">
+                                        <div className="space-y-3">
+                                            <div className="text-[10px] font-black uppercase opacity-40 flex items-center gap-2"><Icon name="globe" size={14}/> 화면 자막 표시</div>
+                                            <div className={`flex p-1.5 rounded-2xl border ${isDarkMode ? 'bg-slate-950 border-white/5 shadow-inner' : 'bg-slate-50 border-slate-200 shadow-inner'}`}>
+                                                {[{id: 'KO', state: showKo, set: setShowKo, label: '한국어'}, {id: 'ZH', state: showZh, set: setShowZh, label: '중국어'}, {id: 'EN', state: showEn, set: setShowEn, label: '영어'}].map(l => (
+                                                    <button key={l.id} onClick={() => l.set(!l.state)} className={`flex-1 py-3 rounded-xl text-xs font-black transition-all flex flex-col items-center gap-0.5 ${l.state ? 'bg-[#1E6F54] text-white shadow-lg scale-[1.03]' : 'text-slate-400 opacity-60 hover:opacity-100'}`}>
+                                                        <span>{l.id}</span>
+                                                        <span className="text-[8px] opacity-60 font-medium">{l.label}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            <div className="text-[10px] font-black uppercase opacity-40 flex items-center gap-2"><Icon name="mouse" size={14}/> 스크립트 클릭 시 동작</div>
+                                            <div className={`flex p-1 rounded-xl border ${isDarkMode ? 'bg-slate-950 border-white/5' : 'bg-slate-50 border-slate-200'}`}>
+                                                <button onClick={() => setClickBehavior('play')} className={`flex-1 py-2.5 rounded-lg text-xs font-black transition-all ${clickBehavior === 'play' ? 'bg-[#1E6F54] text-white' : 'text-slate-400'}`}>바로 재생</button>
+                                                <button onClick={() => setClickBehavior('pause')} className={`flex-1 py-2.5 rounded-lg text-xs font-black transition-all ${clickBehavior === 'pause' ? 'bg-[#1E6F54] text-white' : 'text-slate-400'}`}>이동 후 멈춤</button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-6">
+                                        <div className="space-y-3">
+                                            <div className="flex justify-between text-[10px] font-black uppercase opacity-40">재생 속도 (배속) <span className="text-emerald-600">{playbackRate}x</span></div>
+                                            <div className={`flex p-1 rounded-xl border ${isDarkMode ? 'bg-slate-950 border-white/5' : 'bg-slate-50 border-slate-200'}`}>
+                                                {[0.8, 1.0, 1.2, 1.5].map(rate => (
+                                                    <button key={rate} onClick={() => handleRateChange(rate)} className={`flex-1 py-2 rounded-lg text-xs font-black transition-all ${playbackRate === rate ? 'bg-[#1E6F54] text-white shadow-md' : 'text-slate-400 hover:text-emerald-600'}`}>{rate}x</button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="space-y-3">
+                                            <div className="flex justify-between text-[10px] font-black uppercase opacity-40">A-B 구간 반복 <span className={isLooping ? 'text-emerald-600 font-black' : 'opacity-40'}>{isLooping ? '활성화' : '꺼짐'}</span></div>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => setLoopA(currentTime)} className={`flex-1 py-2.5 rounded-xl text-[10px] font-black border transition-all ${loopA !== null ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-transparent'}`}>{loopA !== null ? `시작(A): ${Math.floor(loopA)}초` : '시작점 설정'}</button>
+                                                <button onClick={() => setLoopB(currentTime)} className={`flex-1 py-2.5 rounded-xl text-[10px] font-black border transition-all ${loopB !== null ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-transparent'}`}>{loopB !== null ? `끝(B): ${Math.floor(loopB)}초` : '끝점 설정'}</button>
+                                                <button onClick={() => setIsLooping(!isLooping)} disabled={loopA === null || loopB === null} className={`px-5 rounded-xl transition-all ${isLooping ? 'bg-emerald-600 text-white shadow-lg' : 'bg-slate-200 dark:bg-slate-800 text-slate-400 opacity-50'}`}><Icon name="anchor" size={18}/></button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="border-t border-slate-200/50 dark:border-white/5 pt-4">
+                                    <button onClick={() => setShowVideoFontSettings(!showVideoFontSettings)} className={`w-full flex items-center justify-center gap-2 py-3.5 text-xs font-black rounded-2xl border transition-all ${showVideoFontSettings ? 'bg-[#1E6F54] text-white border-[#1E6F54]' : isDarkMode ? 'bg-slate-800 border-white/10 text-slate-400' : 'bg-white border-slate-200 text-slate-500 shadow-sm'}`}>
+                                        <Icon name="sliders" size={16} />
+                                        화면 자막 크기 설정 {showVideoFontSettings ? <Icon name="chevronUp" size={14} /> : <Icon name="chevronDown" size={14} />}
+                                    </button>
+
+                                    {showVideoFontSettings && (
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-6 animate-in">
+                                            {[
+                                                {label: 'KO 한국어', val: fontSizeKo, set: setFontSizeKo},
+                                                {label: 'ZH 중국어', val: fontSizeZh, set: setFontSizeZh},
+                                                {label: 'EN 영어', val: fontSizeEn, set: setFontSizeEn}
+                                            ].map((l, i) => (
+                                                <div key={i} className="space-y-3 px-2">
+                                                    <div className="flex justify-between text-[11px] font-bold"><span>{l.label}</span><span className="opacity-40">{l.val}px</span></div>
+                                                    <input type="range" min="14" max="80" value={l.val} onChange={(e) => l.set(Number(e.target.value))} className="w-full" />
+                                                </div>
                                             ))}
                                         </div>
-                                    </div>
-                                    <div className="space-y-3">
-                                        <div className="flex justify-between text-[10px] font-black uppercase opacity-40">A-B Loop <span className={isLooping ? 'text-emerald-600 font-black' : 'opacity-40'}>{isLooping ? 'ON' : 'OFF'}</span></div>
-                                        <div className="flex gap-2">
-                                            <button onClick={() => setLoopA(currentTime)} className={`flex-1 py-2 rounded-lg text-[10px] font-black border transition-all ${loopA !== null ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-50 dark:bg-slate-800 text-slate-400 border-transparent'}`}>{loopA !== null ? `A: ${Math.floor(loopA)}s` : 'Start A'}</button>
-                                            <button onClick={() => setLoopB(currentTime)} className={`flex-1 py-2 rounded-lg text-[10px] font-black border transition-all ${loopB !== null ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-50 dark:bg-slate-800 text-slate-400 border-transparent'}`}>{loopB !== null ? `B: ${Math.floor(loopB)}s` : 'End B'}</button>
-                                            <button onClick={() => setIsLooping(!isLooping)} disabled={loopA === null || loopB === null} className={`px-4 rounded-lg transition-all ${isLooping ? 'bg-emerald-600 text-white shadow-md' : 'bg-slate-200 dark:bg-slate-800 text-slate-400 opacity-50'}`}><Icon name="anchor" size={18}/></button>
-                                        </div>
-                                    </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
 
-                        {/* --- RIGHT: SCRIPT AREA (4) --- */}
-                        <div className={`lg:col-span-4 flex flex-col rounded-[2.5rem] border-2 overflow-hidden h-[85vh] ${cardClass}`}>
-                            <div className={`p-6 border-b border-slate-200 dark:border-white/5 flex flex-col gap-5 ${isDarkMode ? 'bg-white/5' : 'bg-slate-50/50'}`}>
-                                <div className="flex items-center justify-between">
-                                    <h3 className={`font-black text-lg flex items-center gap-2 ${isDarkMode ? 'text-white' : 'text-slate-700'}`}><Icon name="list" size={22} className={accentText} /> Script</h3>
-                                    <div className={`flex p-1 rounded-xl border ${isDarkMode ? 'bg-slate-900 border-white/5' : 'bg-white border-slate-200 shadow-sm'}`}>
+                        {/* 오른쪽 섹션: 스크립트 리스트 (4) */}
+                        <div className={`lg:col-span-4 flex flex-col rounded-[2.5rem] border-2 overflow-hidden h-[85vh] relative ${cardClass}`}>
+                            <div className={`p-6 border-b border-slate-200 dark:border-white/5 flex flex-col gap-4 ${isDarkMode ? 'bg-white/5' : 'bg-slate-50/50'}`}>
+                                <div className="space-y-1.5">
+                                    <h3 className={`font-black text-lg flex items-center gap-2 ${isDarkMode ? 'text-white' : 'text-slate-700'}`}><Icon name="list" size={24} className={accentText} /> 학습 스크립트</h3>
+                                    <p className="text-[10px] text-slate-500 leading-relaxed font-medium">
+                                        ※ 언어마다 어순이 다르므로 학습의 기준이 될 언어를 먼저 선택해 주세요.<br/>
+                                        ※ 본문 텍스트를 드래그하면 즉시 사전을 검색할 수 있습니다.
+                                    </p>
+                                </div>
+
+                                <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-100 dark:bg-slate-900/40 p-2.5 rounded-2xl">
+                                    <div className="flex gap-1.5">
                                         {['ko','zh','en'].map(l => (
-                                            <button key={l} onClick={() => setAnchorLang(l)} className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${anchorLang === l ? 'bg-[#1E6F54] text-white shadow-md' : 'text-slate-400 hover:text-emerald-600'}`}>{l.toUpperCase()}</button>
+                                            <button key={l} onClick={() => setAnchorLang(l)} className={`px-4 py-2 rounded-xl text-[11px] font-black transition-all ${anchorLang === l ? 'bg-[#1E6F54] text-white shadow-md' : 'text-slate-400 hover:text-emerald-600'}`}>{l.toUpperCase()}</button>
                                         ))}
                                     </div>
+                                    <label className="flex items-center gap-2 cursor-pointer px-3 py-2 border rounded-xl border-slate-200 dark:border-white/10 bg-white/5 shadow-sm hover:bg-white/10 transition-all">
+                                        <span className={`text-[11px] font-black ${showPinyin ? accentText : 'text-slate-400'}`}>병음</span>
+                                        <input type="checkbox" checked={showPinyin} onChange={(e) => setShowPinyin(e.target.checked)} className="sr-only" />
+                                        <div className={`w-8 h-4 rounded-full relative transition-colors ${showPinyin ? 'bg-[#1E6F54]' : 'bg-slate-300 dark:bg-slate-700'}`}>
+                                            <div className={`absolute left-0.5 top-0.5 bg-white w-3 h-3 rounded-full transition-transform ${showPinyin ? 'translate-x-4' : 'translate-x-0'}`}></div>
+                                        </div>
+                                    </label>
                                 </div>
-                                <div className="relative">
-                                    <Icon name="search" className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                                    <input type="text" placeholder="스크립트 검색..." className={`w-full pl-12 pr-4 py-3 rounded-2xl border text-sm outline-none transition-all focus:ring-2 focus:ring-emerald-500/20 ${isDarkMode ? 'bg-slate-900 border-white/5 text-white' : 'bg-white border-slate-200 shadow-sm text-slate-700'}`} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+
+                                <div className="space-y-2">
+                                    <div className="relative">
+                                        <Icon name="search" className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                        <input type="text" placeholder="본문 검색..." className={`w-full pl-12 pr-4 py-3.5 rounded-2xl border text-sm outline-none transition-all focus:ring-2 focus:ring-emerald-500/20 ${isDarkMode ? 'bg-slate-900 border-white/5 text-white' : 'bg-white border-slate-200 shadow-sm text-slate-700 font-medium'}`} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                                    </div>
+                                    <div className="flex items-center gap-1.5 text-[10px] text-red-500 font-black px-1">
+                                        <Icon name="alert" size={12} /> 문맥에 따라 의역이 포함될 수 있으니 주의하세요.
+                                    </div>
                                 </div>
                             </div>
 
-                            <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+                            <div ref={scrollRef} onMouseUp={handleMouseUp} className="flex-1 overflow-y-auto p-6 space-y-5 custom-scrollbar select-text">
                                 {filteredList.length > 0 ? (
                                     filteredList.map((item, index) => {
                                         const isActive = (anchorLang === 'ko' && activeIdxKo === index) || (anchorLang === 'zh' && activeIdxZh === index) || (anchorLang === 'en' && activeIdxEn === index);
                                         return (
                                             <div key={index} onClick={() => seekTo(item.start)} className={`p-6 rounded-[2rem] cursor-pointer transition-all border-2 relative overflow-hidden group ${isActive && searchWords.length === 0 ? 'bg-[#1E6F54]/10 border-[#1E6F54] ring-2 ring-emerald-500/10' : isDarkMode ? 'bg-slate-900/40 border-transparent hover:border-white/10 shadow-lg' : 'bg-white border-slate-100 hover:border-[#1E6F54]/20 hover:shadow-xl'}`}>
                                                 <div className="flex justify-between items-center mb-4">
-                                                    <span className={`text-[10px] font-mono px-3 py-1 rounded-lg font-black ${isActive ? 'bg-[#1E6F54] text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>{Math.floor(item.start)}s</span>
-                                                    <Icon name="mouse" size={14} className={`opacity-0 group-hover:opacity-30 transition-opacity ${accentText}`} />
+                                                    <span className={`text-[10px] font-mono px-3 py-1 rounded-lg font-black ${isActive ? 'bg-[#1E6F54] text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>{Math.floor(item.start)}초</span>
                                                 </div>
-                                                <div className="space-y-4">
-                                                    {showKo && item.ko && <p className={`leading-snug transition-all ${isActive ? accentText + ' font-black' : 'opacity-80'}`} style={{ fontSize: `${scriptSizeKo}px` }}>{highlightText(item.ko, searchWords)}</p>}
+                                                <div className="space-y-4 pointer-events-none">
+                                                    {showKo && item.ko && <p className={`leading-snug transition-all ${isActive ? accentText + ' font-black' : 'opacity-90 font-medium'}`} style={{ fontSize: `${scriptSizeKo}px` }}>{highlightText(item.ko, searchWords)}</p>}
                                                     {showZh && item.zh && (
                                                         <div className="space-y-2">
-                                                            {showPinyin && item.pinyin && <span className={`px-2 py-0.5 font-mono text-xs rounded-md ${isActive ? 'bg-[#1E6F54]/10 text-emerald-600' : 'text-slate-400'}`} style={{ fontSize: `${scriptSizeZh * 0.7}px` }}>{highlightText(item.pinyin, searchWords)}</span>}
-                                                            <p className={`leading-relaxed font-bold ${isActive ? 'text-emerald-500' : 'opacity-70'}`} style={{ fontSize: `${scriptSizeZh}px` }}>{highlightText(item.zh, searchWords)}</p>
+                                                            {showPinyin && item.pinyin && <span className={`px-2.5 py-1 font-mono text-xs rounded-md ${isActive ? 'bg-[#1E6F54]/10 text-emerald-600' : 'text-slate-400 bg-slate-50 dark:bg-white/5'}`} style={{ fontSize: `${scriptSizeZh * 0.75}px` }}>{highlightText(item.pinyin, searchWords)}</span>}
+                                                            <p className={`leading-relaxed font-bold ${isActive ? 'text-emerald-500' : 'opacity-80'}`} style={{ fontSize: `${scriptSizeZh}px` }}>{highlightText(item.zh, searchWords)}</p>
                                                         </div>
                                                     )}
                                                     {showEn && item.en && <p className={`leading-relaxed transition-all ${isActive ? 'text-slate-900 dark:text-slate-100' : 'opacity-40 italic'}`} style={{ fontSize: `${scriptSizeEn}px` }}>{highlightText(item.en, searchWords)}</p>}
@@ -362,71 +523,62 @@
                                         );
                                     })
                                 ) : (
-                                    <div className="text-center py-20 opacity-30 italic font-black">No Results Found</div>
+                                    <div className="text-center py-20 opacity-30 italic font-black">검색 결과가 없습니다.</div>
                                 )}
                             </div>
+
+                            {/* 스크립트 글자 크기 조절 */}
+                            <div className={`px-8 py-5 border-t flex flex-col gap-4 ${isDarkMode ? 'bg-slate-950 border-white/5' : 'bg-slate-50 border-slate-200'}`}>
+                                <div className="flex items-center gap-3 text-slate-400">
+                                    <Icon name="type" size={18} />
+                                    <h4 className="text-[11px] font-black uppercase tracking-widest opacity-80">스크립트 글자 크기</h4>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    {[
+                                        {label: 'KO', val: scriptSizeKo, set: setScriptSizeKo},
+                                        {label: 'ZH', val: scriptSizeZh, set: setScriptSizeZh},
+                                        {label: 'EN', val: scriptSizeEn, set: setScriptSizeEn}
+                                    ].map((l, i) => (
+                                        <div key={i} className="flex items-center gap-4">
+                                            <span className="text-[10px] font-black opacity-50 w-6">{l.label}</span>
+                                            <input type="range" min="10" max="40" value={l.val} onChange={(e) => l.set(Number(e.target.value))} className="flex-1" />
+                                            <span className="text-[10px] font-mono opacity-50 w-5 text-right">{l.val}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* 사전 검색 팝업 */}
+                            {dictPopup.show && (
+                                <div 
+                                    className="dict-popup fixed bg-slate-900 text-white rounded-2xl px-5 py-3.5 flex items-center gap-4 shadow-[0_10px_50px_rgba(0,0,0,0.6)] border border-white/20 whitespace-nowrap pointer-events-auto"
+                                    style={{ left: dictPopup.x, top: dictPopup.y }}
+                                    onMouseDown={(e) => e.stopPropagation()} 
+                                >
+                                    <div className="flex flex-col">
+                                        <span className="text-[10px] text-white/40 font-black uppercase tracking-tighter mb-0.5">단어 선택됨</span>
+                                        <span className="text-xs font-bold text-emerald-400 truncate max-w-[150px]">"{dictPopup.text}"</span>
+                                    </div>
+                                    <div className="w-[1px] h-6 bg-white/10"></div>
+                                    <button 
+                                        onClick={() => openDictionary(dictPopup.text)}
+                                        className="flex items-center gap-2 bg-[#1E6F54] hover:bg-emerald-500 px-4 py-2.5 rounded-xl transition-all text-xs font-black shadow-lg"
+                                    >
+                                        <Icon name="external" size={14} />
+                                        네이버 사전
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </main>
 
-                    {/* --- GLOBAL SETTINGS MODAL (Photo 3 Style) --- */}
-                    {showGlobalSettings && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 modal-overlay" onClick={() => setShowGlobalSettings(false)}>
-                            <div className={`w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl animate-modal ${isDarkMode ? 'bg-slate-900 border border-white/10' : 'bg-white border border-slate-200'}`} onClick={e => e.stopPropagation()}>
-                                <div className="flex justify-between items-center mb-8">
-                                    <h2 className="text-2xl font-black tracking-tight flex items-center gap-3"><Icon name="settings" size={24} className={accentText} /> Preferences</h2>
-                                    <button onClick={() => setShowGlobalSettings(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full"><Icon name="x" size={20} /></button>
-                                </div>
-
-                                <div className="space-y-8">
-                                    {/* Subtitle Toggles */}
-                                    <div className="space-y-4">
-                                        <label className="text-xs font-black uppercase tracking-widest opacity-40">Subtitle Visibility</label>
-                                        <div className={`flex p-2 rounded-2xl border ${isDarkMode ? 'bg-slate-950 border-white/5 shadow-inner' : 'bg-slate-50 border-slate-200'}`}>
-                                            {[
-                                                {id: 'KO', state: showKo, set: setShowKo},
-                                                {id: 'ZH', state: showZh, set: setShowZh},
-                                                {id: 'EN', state: showEn, set: setShowEn}
-                                            ].map(l => (
-                                                <button key={l.id} onClick={() => l.set(!l.state)} className={`flex-1 py-3 rounded-xl text-xs font-black transition-all ${l.state ? 'bg-[#1E6F54] text-white shadow-lg' : 'text-slate-400 opacity-60'}`}>{l.id}</button>
-                                            ))}
-                                        </div>
-                                        <button onClick={() => setShowPinyin(!showPinyin)} className={`w-full py-3 rounded-xl text-xs font-black border transition-all ${showPinyin ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'text-slate-400 opacity-40 border-transparent'}`}>ZH Pinyin Toggle</button>
-                                    </div>
-
-                                    {/* Font Size Sliders */}
-                                    <div className="space-y-6">
-                                        <label className="text-xs font-black uppercase tracking-widest opacity-40">Font Size (Video Overlay)</label>
-                                        <div className="space-y-5">
-                                            {[
-                                                {label: 'KO', val: fontSizeKo, set: setFontSizeKo},
-                                                {label: 'ZH', val: fontSizeZh, set: setFontSizeZh},
-                                                {label: 'EN', val: fontSizeEn, set: setFontSizeEn}
-                                            ].map((l, i) => (
-                                                <div key={i} className="flex items-center gap-6">
-                                                    <span className="text-xs font-black opacity-50 w-8">{l.label}</span>
-                                                    <input type="range" min="14" max="80" value={l.val} onChange={(e) => l.set(Number(e.target.value))} className="flex-1" />
-                                                    <span className="text-xs font-mono opacity-40 w-6 text-right">{l.val}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-6">
-                                        <label className="text-xs font-black uppercase tracking-widest opacity-40">Script Click Behavior</label>
-                                        <div className={`flex p-1.5 rounded-2xl border ${isDarkMode ? 'bg-slate-950 border-white/5' : 'bg-slate-50 border-slate-200'}`}>
-                                            <button onClick={() => setClickBehavior('play')} className={`flex-1 py-2 rounded-xl text-[10px] font-black transition-all ${clickBehavior === 'play' ? 'bg-[#1E6F54] text-white' : 'text-slate-400'}`}>Move & Play</button>
-                                            <button onClick={() => setClickBehavior('pause')} className={`flex-1 py-2 rounded-xl text-[10px] font-black transition-all ${clickBehavior === 'pause' ? 'bg-[#1E6F54] text-white' : 'text-slate-400'}`}>Move & Pause</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                    {/* 푸터 */}
+                    <footer className={`h-[45px] px-8 border-t flex items-center justify-between text-[11px] font-black uppercase tracking-widest ${isDarkMode ? 'bg-slate-950 text-slate-700 border-white/5' : 'bg-white text-slate-300 border-slate-200'}`}>
+                        <span>JW Player Pro v10.0 Clipper Edition</span>
+                        <div className="flex items-center gap-4">
+                            <span className="opacity-50 italic">JW.org 링크만 복사해 넣으세요!</span>
+                            <span className="text-emerald-700/50">#1E6F54 Theme</span>
                         </div>
-                    )}
-
-                    {/* --- FOOTER --- */}
-                    <footer className={`h-[40px] px-8 border-t flex items-center justify-between text-[10px] font-black uppercase tracking-widest ${isDarkMode ? 'bg-slate-950 text-slate-700 border-white/5' : 'bg-white text-slate-300 border-slate-200'}`}>
-                        <span>JW Multiple Player Pro v6.0</span>
-                        <span className="opacity-50 tracking-tighter">6:4 Golden Layout Active</span>
                     </footer>
                 </div>
             );

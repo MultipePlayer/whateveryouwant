@@ -4,76 +4,40 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JW Multiple Player Pro - 아카이브 통합 에디션</title>
-    <!-- React 및 필수 라이브러리 CDN -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     
     <style>
-        /* 커스텀 스크롤바 */
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { border-radius: 10px; background: #1E6F54; }
-        
         mark { color: inherit; border-radius: 2px; }
-
-        /* 슬라이더 스타일 */
         input[type=range] { -webkit-appearance: none; background: transparent; }
         input[type=range]:focus { outline: none; }
         input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            height: 12px;
-            width: 12px;
-            border-radius: 50%;
-            background: #1E6F54; 
-            cursor: pointer;
-            margin-top: -4.5px;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+            -webkit-appearance: none; height: 12px; width: 12px; border-radius: 50%;
+            background: #1E6F54; cursor: pointer; margin-top: -4.5px; box-shadow: 0 1px 2px rgba(0,0,0,0.2);
         }
         input[type=range]::-webkit-slider-runnable-track {
-            width: 100%;
-            height: 3px;
-            cursor: pointer;
-            background: rgba(30, 111, 84, 0.15);
-            border-radius: 2px;
+            width: 100%; height: 3px; cursor: pointer; background: rgba(30, 111, 84, 0.15); border-radius: 2px;
         }
-
-        /* 팝업 애니메이션 */
         .dict-popup { animation: fadeInScale 0.1s ease-out; z-index: 1000; }
         @keyframes fadeInScale {
             from { opacity: 0; transform: scale(0.95) translateY(5px); }
             to { opacity: 1; transform: scale(1) translateY(0); }
         }
-
         .loading-spinner {
-            border: 2px solid rgba(30, 111, 84, 0.1);
-            border-top: 2px solid #1E6F54;
-            border-radius: 50%;
-            width: 14px;
-            height: 14px;
-            animation: spin 1s linear infinite;
+            border: 2px solid rgba(30, 111, 84, 0.1); border-top: 2px solid #1E6F54;
+            border-radius: 50%; width: 14px; height: 14px; animation: spin 1s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
         ::selection { background: #1E6F54; color: white; }
-
-        @media (max-width: 1023px) {
-            .sticky-video-container { position: sticky; top: 45px; z-index: 40; }
-        }
-
-        /* 자막 텍스트 외곽선 및 그림자 */
-        .text-outline {
-            text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 2px 4px rgba(0,0,0,0.8);
-        }
-
-        /* 가독성을 위해 모든 텍스트에서 굵기 제거 */
+        @media (max-width: 1023px) { .sticky-video-container { position: sticky; top: 45px; z-index: 40; } }
+        .text-outline { text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 2px 4px rgba(0,0,0,0.8); }
         * { font-weight: 400 !important; }
-        /* 제목과 로고만 예외적으로 강조 */
-        nav h1, h3, .brand-logo, .status-badge { font-weight: 800 !important; }
-        
-        /* 폰트 크기 고정 클래스 */
-        .fixed-font-10 { font-size: 10px !important; }
+        nav h1, h3, .brand-logo, .status-badge, button { font-weight: 800 !important; }
         .pinyin-font { font-family: sans-serif; letter-spacing: 0.01em; }
     </style>
 </head>
@@ -84,14 +48,12 @@
         const { useState, useRef, useEffect, useMemo } = React;
 
         const apiKey = ""; // Gemini API Key
-        // GitHub 데이터 아카이브 인덱스 주소 (whateveryouwant 저장소)
         const DEFAULT_ARCHIVE_URL = "https://raw.githubusercontent.com/MultipePlayer/whateveryouwant/refs/heads/main/data/jw_data_index.json";
 
         const Icon = ({ name, size = 14, className = "" }) => {
             const icons = {
                 play: <polygon points="5 3 19 12 5 21 5 3"></polygon>,
                 pause: <><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></>,
-                sun: <><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></>,
                 search: <><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></>,
                 list: <><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></>,
                 anchor: <path d="M12 22v-5m0-10V2m0 5a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5z"></path>,
@@ -101,7 +63,8 @@
                 globe: <><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></>,
                 alert: <><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></>,
                 sync: <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" />,
-                external: <><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></>
+                external: <><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></>,
+                type: <><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line></>
             };
             return (
                 <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -155,7 +118,7 @@
 
             const [tracks, setTracks] = useState({ ko: [], zh: [], en: [] });
 
-            // --- 아카이브 동기화 엔진: 지도 읽기 → 조각 모으기 → 하나로 합치기 ---
+            // 아카이브 데이터 로드 및 인덱싱
             useEffect(() => {
                 const syncArchive = async () => {
                     setSyncStatus("syncing");
@@ -174,8 +137,7 @@
                                     const chunkData = await chunkRes.json();
                                     chunkData.forEach(item => {
                                         if (item.natural_key) {
-                                            // 매칭 시 접미사 유무에 상관없도록 여러 키로 저장
-                                            const cleanKey = item.natural_key.replace('_VIDEO', '');
+                                            const cleanKey = item.natural_key.replace('_VIDEO', '').toLowerCase();
                                             const videoData = {
                                                 videoUrl: item.url,
                                                 tracks: {
@@ -185,13 +147,12 @@
                                                 }
                                             };
                                             mergedLibrary[cleanKey] = videoData;
-                                            mergedLibrary[cleanKey + '_VIDEO'] = videoData;
+                                            // 매칭 확률을 높이기 위해 원본 키도 저장
+                                            mergedLibrary[item.natural_key.toLowerCase()] = videoData;
                                         }
                                     });
                                 }
-                            } catch (err) {
-                                console.warn(`${fileName} 로드 실패`);
-                            }
+                            } catch (err) { console.warn(`${fileName} 로드 실패`); }
                         }
                         setDataLibrary(mergedLibrary);
                         setSyncStatus("ready");
@@ -203,22 +164,27 @@
                 syncArchive();
             }, []);
 
-            // URL 파싱 로직 (인코딩 및 해시 대응 최적화)
+            // URL에서 미디어 코드 추출 (정교화된 로직)
             const getMediaCode = (url) => {
                 if (!url) return null;
                 const decodedUrl = decodeURIComponent(url);
                 
                 // 1. 해시 파싱 (#ko/mediaitems/.../pub-code_VIDEO)
                 const hashMatch = decodedUrl.match(/mediaitems\/[^/]+\/([^/?#]+)/);
-                if (hashMatch) return hashMatch[1].trim();
+                if (hashMatch) return hashMatch[1].replace('_VIDEO', '').trim().toLowerCase();
 
-                // 2. 쿼리 파라미터 (item=CODE)
+                // 2. 쿼리 파라미터 (item=CODE, lank=CODE)
                 const searchParams = new URLSearchParams(decodedUrl.split('?')[1]);
-                if (searchParams.has('item')) return searchParams.get('item').trim();
+                const item = searchParams.get('item') || searchParams.get('lank');
+                if (item) return item.replace('_VIDEO', '').trim().toLowerCase();
 
-                // 3. 경로 기반 추출
-                const pathMatch = decodedUrl.match(/\/([^/]+)_VIDEO/);
-                if (pathMatch) return pathMatch[1].trim();
+                // 3. 파일명 직접 추출 (CO-r20_KO_04_r240P.mp4 -> CO-r20_04)
+                const fileMatch = decodedUrl.match(/\/([^/_]+)_(?:[A-Z]{2})_(\d+)_/);
+                if (fileMatch) return `${fileMatch[1]}_${parseInt(fileMatch[2])}`.toLowerCase();
+                
+                // 4. 일반적인 _VIDEO 패턴
+                const videoMatch = decodedUrl.match(/\/([^/]+)_VIDEO/);
+                if (videoMatch) return videoMatch[1].replace('_VIDEO', '').trim().toLowerCase();
 
                 return null;
             };
@@ -228,37 +194,55 @@
                 setIsClipping(true);
 
                 const mediaCode = getMediaCode(inputUrl);
+                console.log("Extracted Media Code:", mediaCode);
                 
-                // 1. 동기화된 라이브러리에서 검색 (가장 우선)
+                // 1. 아카이브 라이브러리 매칭
                 if (mediaCode) {
-                    const cleanCode = mediaCode.replace('_VIDEO', '');
-                    const matched = dataLibrary[mediaCode] || dataLibrary[cleanCode];
+                    // 완전 일치 또는 유사 일치 확인
+                    const matched = dataLibrary[mediaCode] || 
+                                    dataLibrary[`pub-${mediaCode}`] || 
+                                    Object.keys(dataLibrary).find(k => k.includes(mediaCode)) ? dataLibrary[Object.keys(dataLibrary).find(k => k.includes(mediaCode))] : null;
+
                     if (matched) {
                         setVideoUrl(matched.videoUrl);
-                        if (matched.tracks) setTracks(matched.tracks);
+                        setTracks(matched.tracks);
                         setIsClipping(false);
                         return;
                     }
                 }
 
-                // 2. 라이브러리에 없는 경우 실시간 분석 시도
+                // 2. 라이브러리에 없는 경우 실시간 분석 시도 (Gemini Flash 활용)
                 try {
-                    const prompt = `Directly analyze JW.org video sharing link: "${inputUrl}". Extract high-quality MP4 URL and transcripts for ko, zh (with pinyin), en. Return strictly JSON: { "videoUrl": "string", "tracks": { "ko": [], "zh": [], "en": [] } }. Precise float timestamps required.`;
+                    const prompt = `당신은 JW.org 미디어 분석 전문가입니다. 다음 링크: "${inputUrl}"를 분석하여 실제 MP4 영상 주소와 한국어(ko), 중국어(zh, pinyin 포함), 영어(en) 자막 데이터를 추출하세요. 
+                    반드시 JSON 형식으로만 응답하세요: { "videoUrl": "string", "tracks": { "ko": [{"start": float, "end": float, "text": "string"}], "zh": [{"start": float, "end": float, "text": "string", "pinyin": "string"}], "en": [{"start": float, "end": float, "text": "string"}] } }. 
+                    아카이브에 없는 최신 영상이므로 구글 검색 도구를 사용하여 정보를 찾으세요.`;
+
                     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], tools: [{ "google_search": {} }], generationConfig: { responseMimeType: "application/json" } })
+                        body: JSON.stringify({ 
+                            contents: [{ parts: [{ text: prompt }] }], 
+                            tools: [{ "google_search": {} }], 
+                            generationConfig: { responseMimeType: "application/json" } 
+                        })
                     });
                     const result = await response.json();
                     const data = JSON.parse(result.candidates?.[0]?.content?.parts?.[0]?.text || "{}");
+                    
                     if (data.videoUrl) {
                         setVideoUrl(data.videoUrl);
                         if (data.tracks) setTracks(data.tracks);
                     } else {
-                        alert("라이브러리 및 실시간 분석에서 정보를 찾지 못했습니다. 미디어 코드가 아카이브에 포함되어 있는지 확인해 주세요.");
+                        // 최후의 수단: 입력된 주소가 직접 MP4라면 영상만이라도 재생
+                        if (inputUrl.toLowerCase().endsWith('.mp4')) {
+                            setVideoUrl(inputUrl);
+                            setTracks({ ko: [], zh: [], en: [] });
+                        } else {
+                            alert("해당 미디어 정보를 아카이브에서 찾을 수 없으며, 실시간 분석에도 실패했습니다. 링크가 올바른지 확인해주세요.");
+                        }
                     }
                 } catch (err) {
-                    alert("데이터 분석 중 오류가 발생했습니다.");
+                    alert("데이터 로드 중 오류가 발생했습니다.");
                 } finally {
                     setIsClipping(false);
                 }
@@ -270,11 +254,22 @@
                 else { videoRef.current.pause(); setIsPlaying(false); }
             };
 
+            const handleRateChange = (rate) => {
+                if (videoRef.current) {
+                    videoRef.current.playbackRate = rate;
+                    setPlaybackRate(rate);
+                }
+            };
+
             const handleTimeUpdate = () => {
                 if (!videoRef.current) return;
                 const time = videoRef.current.currentTime;
                 setCurrentTime(time);
-                if (isLooping && loopA !== null && loopB !== null && time >= loopB) { videoRef.current.currentTime = loopA; }
+                
+                if (isLooping && loopA !== null && loopB !== null && time >= loopB) { 
+                    videoRef.current.currentTime = loopA; 
+                }
+
                 setActiveIdxKo((tracks.ko || []).findIndex(it => time >= it.start && time < it.end));
                 setActiveIdxEn((tracks.en || []).findIndex(it => time >= it.start && time < it.end));
                 setActiveIdxZh((tracks.zh || []).findIndex(it => time >= it.start && time < it.end));
@@ -287,7 +282,6 @@
                 else { videoRef.current.pause(); setIsPlaying(false); }
             };
 
-            // 스크롤 보정 (박스 내 최상단 유지)
             useEffect(() => {
                 const leadIdx = anchorLang === 'ko' ? activeIdxKo : anchorLang === 'zh' ? activeIdxZh : activeIdxEn;
                 if (leadIdx !== -1 && scrollRef.current && searchTerm === "") {
@@ -303,7 +297,7 @@
             const handleMouseUp = (e) => {
                 const selection = window.getSelection();
                 const text = selection.toString().trim();
-                if (text && text.length > 0) {
+                if (text) {
                     const range = selection.getRangeAt(0);
                     const rect = range.getBoundingClientRect();
                     setDictPopup({ show: true, x: rect.left + window.scrollX, y: rect.top + window.scrollY - 45, text: text });
@@ -362,42 +356,35 @@
 
             return (
                 <div className="min-h-screen font-sans flex flex-col relative overflow-hidden bg-white text-slate-900">
-                    
-                    {/* 상단 바 */}
                     <nav className="h-[45px] border-b px-4 lg:px-6 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-50">
                         <div className="flex items-center gap-3">
-                            <div className="bg-[#1E6F54] w-6 h-6 rounded-lg flex items-center justify-center text-white text-[10px] brand-logo shadow-sm">MP</div>
+                            <div className="bg-[#1E6F54] w-6 h-6 rounded-lg flex items-center justify-center text-white text-[10px] brand-logo">MP</div>
                             <h1 className="text-[11px] lg:text-[12px] text-[#1E6F54] tracking-tight hidden sm:block uppercase">JW Player Pro</h1>
                         </div>
-                        
                         <div className="flex items-center gap-3 flex-1 max-w-lg mx-6 relative">
                             <div className="relative w-full">
                                 <Icon name="globe" size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                                <input type="text" placeholder="JW.org 영상 주소(해시 링크 가능)를 입력하세요..." className="w-full pl-9 pr-8 py-1.5 rounded-lg border border-slate-300 text-xs outline-none focus:ring-1 focus:ring-emerald-500 bg-white" value={inputUrl} onChange={(e) => setInputUrl(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleClipVideo()} />
+                                <input type="text" placeholder="링크를 입력하세요 (해시, 쿼리, MP4 모두 가능)" className="w-full pl-9 pr-8 py-1.5 rounded-lg border border-slate-300 text-xs outline-none focus:ring-1 focus:ring-emerald-500 bg-white" value={inputUrl} onChange={(e) => setInputUrl(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleClipVideo()} />
                                 <button onClick={() => setShowHelp(!showHelp)} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-emerald-600"><Icon name="help" size={12} /></button>
                             </div>
                             <button onClick={handleClipVideo} disabled={isClipping} className="px-4 py-1.5 bg-[#1E6F54] text-white text-[10px] rounded-lg shrink-0 active:scale-95 disabled:opacity-50 transition-all font-bold">
-                                {isClipping ? <div className="loading-spinner"></div> : "검색"}
+                                {isClipping ? <div className="loading-spinner"></div> : "연동"}
                             </button>
                         </div>
                         <div className="flex items-center gap-2">
-                             <div className={`text-[9px] px-2 py-0.5 rounded-full border flex items-center gap-1.5 fixed-font-10 ${syncStatus === 'ready' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+                             <div className={`text-[9px] px-2 py-0.5 rounded-full border flex items-center gap-1.5 status-badge ${syncStatus === 'ready' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
                                 <Icon name="sync" size={10} className={syncStatus === 'syncing' ? 'animate-spin' : ''} />
-                                {syncStatus === 'ready' ? 'Archive Loaded' : syncStatus === 'syncing' ? 'Syncing...' : 'Sync Pending'}
+                                {syncStatus === 'ready' ? 'DB Ready' : syncStatus === 'syncing' ? 'Syncing...' : 'Pending'}
                              </div>
                         </div>
                     </nav>
 
                     <main className="max-w-[1700px] mx-auto p-3 lg:p-4 grid grid-cols-1 lg:grid-cols-10 gap-4 flex-1 w-full overflow-hidden">
-                        
-                        {/* 왼쪽 영상 섹션 (6) */}
                         <div className="lg:col-span-6 flex flex-col gap-4 sticky-video-container">
-                            
                             <div className="aspect-video rounded-[1.5rem] lg:rounded-[2rem] overflow-hidden shadow-lg relative border-2 border-slate-100 bg-black">
                                 <video key={videoUrl} ref={videoRef} onClick={togglePlay} className="w-full h-full object-contain cursor-pointer" onTimeUpdate={handleTimeUpdate} onLoadedMetadata={(e) => setDuration(e.target.duration)} playsInline>
                                     <source src={videoUrl} type="video/mp4" />
                                 </video>
-                                
                                 <div className="absolute inset-x-0 bottom-0 p-4 lg:p-6 text-center pointer-events-none flex flex-col items-center justify-end min-h-[40%]">
                                     <div className="space-y-1.5 flex flex-col items-center w-full">
                                         {showKo && activeIdxKo !== -1 && (
@@ -408,7 +395,7 @@
                                         {showZh && activeIdxZh !== -1 && (
                                             <div className="flex flex-col items-center gap-1">
                                                 {showPinyin && (
-                                                    <span className="bg-black/70 rounded px-2.5 py-0.5 text-white text-outline inline-block tracking-wide text-xs pinyin-font font-normal" style={{ fontSize: `${fontSizeZh * 0.6}px` }}>
+                                                    <span className="bg-black/70 rounded px-2.5 py-0.5 text-white text-outline inline-block tracking-wide text-xs pinyin-font" style={{ fontSize: `${fontSizeZh * 0.6}px` }}>
                                                         {tracks.zh[activeIdxZh].pinyin}
                                                     </span>
                                                 )}
@@ -426,15 +413,14 @@
                                 </div>
                             </div>
 
-                            {/* 컨트롤 및 설정 박스 */}
                             <div className="p-4 lg:p-5 rounded-[1.5rem] border-2 border-slate-200 bg-white flex flex-col gap-4 shadow-sm">
-                                <div className="flex items-center gap-4 fixed-font-10">
+                                <div className="flex items-center gap-4 text-[10px]">
                                     <button onClick={togglePlay} className="bg-[#1E6F54] w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-md active:scale-95 transition-all shrink-0">
                                         <Icon name={isPlaying ? "pause" : "play"} size={16} />
                                     </button>
                                     <div className="flex-1">
                                         <div className="flex justify-between items-end mb-1 px-1">
-                                            <span className="text-slate-500 uppercase tracking-widest font-black status-badge">PLAYING</span>
+                                            <span className="text-slate-500 uppercase tracking-widest status-badge">PLAYING</span>
                                             <span className="font-mono text-slate-900">{Math.floor(currentTime)}s / {Math.floor(duration)}s</span>
                                         </div>
                                         <div className="h-1.5 rounded-full relative overflow-hidden cursor-pointer bg-slate-100" onClick={(e) => {
@@ -446,192 +432,138 @@
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-1 border-t border-slate-100 fixed-font-10">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-1 border-t border-slate-100 text-[10px]">
                                     <div className="space-y-3">
                                         <div className="space-y-1.5">
-                                            <label className="text-slate-500 uppercase flex items-center gap-1.5 font-black status-badge"><Icon name="globe" size={12}/> 자막 활성화</label>
+                                            <label className="text-slate-500 uppercase flex items-center gap-1.5 status-badge"><Icon name="globe" size={12}/> 자막 활성화</label>
                                             <div className="flex p-0.5 rounded-lg border border-slate-200 bg-slate-50">
                                                 {[{id: 'KO', state: showKo, set: setShowKo}, {id: 'ZH', state: showZh, set: setShowZh}, {id: 'EN', state: showEn, set: setShowEn}].map(l => (
-                                                    <button key={l.id} onClick={() => l.set(!l.state)} className={`flex-1 py-1 rounded-md transition-all ${l.state ? 'bg-[#1E6F54] text-white shadow-sm' : 'text-slate-500'}`}>{l.id}</button>
+                                                    <button key={l.id} onClick={() => l.set(!l.state)} className={`flex-1 py-1 rounded-md transition-all ${l.state ? 'bg-[#1E6F54] text-white' : 'text-slate-500'}`}>{l.id}</button>
                                                 ))}
                                             </div>
                                         </div>
                                         <div className="space-y-1.5">
-                                            <label className="text-slate-500 uppercase flex items-center gap-1.5 font-black status-badge"><Icon name="mouse" size={12}/> 스크립트 클릭 시 동작</label>
+                                            <label className="text-slate-500 uppercase flex items-center gap-1.5 status-badge"><Icon name="mouse" size={12}/> 클릭 동작</label>
                                             <div className="flex p-0.5 rounded-lg border border-slate-200 bg-slate-50">
-                                                <button onClick={() => setClickBehavior('play')} className={`flex-1 py-1 rounded-md transition-all ${clickBehavior === 'play' ? 'bg-[#1E6F54] text-white' : 'text-slate-500'}`}>바로 재생</button>
-                                                <button onClick={() => setClickBehavior('pause')} className={`flex-1 py-1 rounded-md transition-all ${clickBehavior === 'pause' ? 'bg-[#1E6F54] text-white' : 'text-slate-500'}`}>정지 이동</button>
+                                                <button onClick={() => setClickBehavior('play')} className={`flex-1 py-1 rounded-md transition-all ${clickBehavior === 'play' ? 'bg-[#1E6F54] text-white' : 'text-slate-500'}`}>재생</button>
+                                                <button onClick={() => setClickBehavior('pause')} className={`flex-1 py-1 rounded-md transition-all ${clickBehavior === 'pause' ? 'bg-[#1E6F54] text-white' : 'text-slate-500'}`}>이동</button>
                                             </div>
                                         </div>
                                     </div>
 
                                     <div className="space-y-3">
                                         <div className="space-y-1.5">
-                                            <div className="flex justify-between text-slate-500 uppercase font-black status-badge">배속 설정 <span className="text-emerald-700">{playbackRate}x</span></div>
+                                            <div className="flex justify-between text-slate-500 uppercase status-badge">배속 <span className="text-emerald-700">{playbackRate}x</span></div>
                                             <div className="flex p-0.5 rounded-lg border border-slate-200 bg-slate-50">
                                                 {[0.8, 1.0, 1.2, 1.5].map(rate => (
-                                                    <button key={rate} onClick={() => handleRateChange(rate)} className={`flex-1 py-1 rounded-md transition-all ${playbackRate === rate ? 'bg-[#1E6F54] text-white shadow-sm' : 'text-slate-500'}`}>{rate}x</button>
+                                                    <button key={rate} onClick={() => handleRateChange(rate)} className={`flex-1 py-1 rounded-md transition-all ${playbackRate === rate ? 'bg-[#1E6F54] text-white' : 'text-slate-500'}`}>{rate}x</button>
                                                 ))}
                                             </div>
                                         </div>
                                         <div className="space-y-1.5">
-                                            <div className="flex justify-between text-slate-500 uppercase tracking-widest font-black status-badge">구간 반복 설정</div>
+                                            <div className="flex justify-between text-slate-500 uppercase status-badge">구간 반복</div>
                                             <div className="grid grid-cols-3 gap-1 p-0.5 rounded-lg border border-slate-200 bg-slate-50 h-[32px]">
-                                                <button onClick={() => setLoopA(currentTime)} className={`rounded-md border transition-all ${loopA !== null ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-white text-slate-500 border-slate-200'}`}>A</button>
-                                                <button onClick={() => setLoopB(currentTime)} className={`rounded-md border transition-all ${loopB !== null ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-white text-slate-500 border-slate-200'}`}>B</button>
-                                                <button onClick={() => setIsLooping(!isLooping)} disabled={loopA === null || loopB === null} className={`rounded-md transition-all border flex items-center justify-center ${isLooping ? 'bg-emerald-700 text-white border-emerald-800 shadow-sm font-black' : 'bg-white text-slate-400 border-slate-200 opacity-50'}`}>
-                                                  {isLooping ? 'ON' : 'OFF'}
-                                                </button>
+                                                <button onClick={() => setLoopA(currentTime)} className={`rounded-md border text-[9px] ${loopA !== null ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-white text-slate-500 border-slate-200'}`}>A</button>
+                                                <button onClick={() => setLoopB(currentTime)} className={`rounded-md border text-[9px] ${loopB !== null ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-white text-slate-500 border-slate-200'}`}>B</button>
+                                                <button onClick={() => setIsLooping(!isLooping)} disabled={loopA === null || loopB === null} className={`rounded-md border text-[9px] ${isLooping ? 'bg-emerald-700 text-white' : 'bg-white text-slate-300'}`}>{isLooping ? 'ON' : 'OFF'}</button>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-
-                                <div className="border-t border-slate-100 pt-3 fixed-font-10">
-                                    <div className="flex items-center justify-between mb-3 px-1">
-                                        <button onClick={() => setShowVideoFontSettings(!showVideoFontSettings)} className="flex items-center gap-1.5 text-slate-600 uppercase tracking-tighter font-black status-badge">
-                                            <Icon name="sliders" size={12} /> 영상 자막 크기 조절 {showVideoFontSettings ? '▲' : '▼'}
-                                        </button>
-                                        <button onClick={() => setAllVideoFontSize(18)} className="text-[#1E6F54] bg-[#1E6F54]/10 px-2 py-0.5 rounded transition-colors hover:bg-[#1E6F54]/20 font-black status-badge">전체 18px로</button>
-                                    </div>
-
-                                    {showVideoFontSettings && (
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pb-2 animate-in">
-                                            {[ {label: 'KO', val: fontSizeKo, set: setFontSizeKo}, {label: 'ZH', val: fontSizeZh, set: setFontSizeZh}, {label: 'EN', val: fontSizeEn, set: setFontSizeEn} ].map((l, i) => (
-                                                <div key={i} className="space-y-1 px-1">
-                                                    <div className="flex justify-between text-slate-500 uppercase font-black status-badge"><span>{l.label} Size</span><span>{l.val}px</span></div>
-                                                    <input type="range" min="14" max="25" value={l.val} onChange={(e) => l.set(Number(e.target.value))} className="w-full" />
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
                                 </div>
                             </div>
                         </div>
 
-                        {/* 오른쪽 스크립트 섹션 (4) */}
                         <div className="lg:col-span-4 flex flex-col rounded-[1.5rem] lg:rounded-[2.5rem] border-2 border-slate-200 overflow-hidden h-[85vh] relative bg-white shadow-sm">
-                            
                             <div className="p-4 lg:p-5 border-b border-slate-100 flex flex-col gap-3 bg-slate-50">
-                                <div className="space-y-1">
-                                    <h3 className="text-sm flex items-center gap-2 text-slate-900 uppercase font-black"><Icon name="list" size={16} className="text-[#1E6F54]" /> 학습 스크립트</h3>
-                                    <div className="flex flex-col gap-0.5 px-1 py-1 bg-white/50 rounded-lg border border-slate-200/50">
-                                        <p className="text-[9px] text-slate-600 leading-relaxed font-normal">
-                                            ※ 언어마다 어순이 다릅니다. 학습 기준 언어를 먼저 선택하세요.<br/>
-                                            ※ 텍스트 드래그 시 즉시 단어 사전 검색이 가능합니다.
-                                        </p>
-                                    </div>
-                                </div>
-
+                                <h3 className="text-sm flex items-center gap-2 text-slate-900 uppercase font-black"><Icon name="list" size={16} className="text-[#1E6F54]" /> 스크립트</h3>
                                 <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-3">
                                     <div className="flex items-center gap-2">
                                         <Icon name="anchor" size={14} className="text-[#1E6F54]" />
-                                        <div className="flex p-0.5 rounded-lg border border-slate-200 bg-white shadow-xs">
+                                        <div className="flex p-0.5 rounded-lg border border-slate-200 bg-white">
                                             {['ko','zh','en'].map(l => (
-                                                <button key={l} onClick={() => setAnchorLang(l)} className={`px-3 py-1 rounded-md text-[10px] transition-all ${anchorLang === l ? 'bg-[#1E6F54] text-white shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}>{l.toUpperCase()}</button>
+                                                <button key={l} onClick={() => setAnchorLang(l)} className={`px-3 py-1 rounded-md text-[10px] transition-all ${anchorLang === l ? 'bg-[#1E6F54] text-white' : 'text-slate-500'}`}>{l.toUpperCase()}</button>
                                             ))}
                                         </div>
                                     </div>
-                                    <label className="flex items-center gap-1.5 cursor-pointer px-2 py-1 rounded-md border border-slate-200 bg-white shadow-sm hover:bg-slate-50 transition-colors">
-                                        <span className="text-[10px] text-slate-500">병음 표시</span>
+                                    <label className="flex items-center gap-1.5 cursor-pointer px-2 py-1 rounded-md border border-slate-200 bg-white">
+                                        <span className="text-[10px] text-slate-500">병음</span>
                                         <input type="checkbox" checked={showPinyin} onChange={(e) => setShowPinyin(e.target.checked)} className="sr-only" />
                                         <div className={`w-6 h-3 rounded-full relative transition-colors ${showPinyin ? 'bg-[#1E6F54]' : 'bg-slate-300'}`}>
                                             <div className={`absolute left-0.5 top-0.5 bg-white w-2 h-2 rounded-full transition-transform ${showPinyin ? 'translate-x-3' : 'translate-x-0'}`}></div>
                                         </div>
                                     </label>
                                 </div>
-
-                                <div className="space-y-1">
-                                    <div className="relative">
-                                        <Icon name="search" size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                                        <input type="text" placeholder="스크립트 내용 검색..." className="w-full pl-8 pr-4 py-2 rounded-lg border border-slate-200 text-[11px] outline-none transition-all focus:ring-1 focus:ring-emerald-500 bg-white text-slate-900 font-normal" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-                                    </div>
-                                    <div className="px-1 text-[9px] text-red-600 flex items-center gap-1 font-medium">
-                                        <Icon name="alert" size={10} /> 문맥에 따라 의역이 포함되어 있을 수 있으니 참고하시기 바랍니다.
-                                    </div>
+                                <div className="relative">
+                                    <Icon name="search" size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                                    <input type="text" placeholder="검색..." className="w-full pl-8 pr-4 py-2 rounded-lg border border-slate-200 text-[11px] outline-none bg-white" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                                 </div>
                             </div>
 
-                            {/* 스크립트 본문 */}
                             <div ref={scrollRef} onMouseUp={handleMouseUp} className="flex-1 overflow-y-auto p-4 lg:p-5 space-y-4 custom-scrollbar select-text bg-white">
                                 {filteredList.length > 0 ? (
                                     filteredList.map((item, index) => {
                                         const isActive = (anchorLang === 'ko' && activeIdxKo === index) || (anchorLang === 'zh' && activeIdxZh === index) || (anchorLang === 'en' && activeIdxEn === index);
                                         return (
-                                            <div 
-                                                key={index} 
-                                                ref={el => listItemsRef.current[index] = el}
-                                                onClick={() => seekTo(item.start)} 
-                                                className={`p-4 rounded-xl cursor-pointer transition-all border relative overflow-hidden group ${isActive && searchTerm === "" ? 'bg-emerald-50/50 border-emerald-500/30 ring-1 ring-emerald-500/10 shadow-sm' : 'bg-white border-slate-100 hover:border-emerald-500/10'}`}
-                                            >
-                                                <div className="flex justify-between items-center mb-2">
-                                                    <span className={`text-[8px] font-mono px-1.5 py-0.5 rounded ${isActive ? 'bg-[#1E6F54] text-white shadow-sm' : 'bg-slate-100 text-slate-500'}`}>{Math.floor(item.start)}s</span>
+                                            <div key={index} ref={el => listItemsRef.current[index] = el} onClick={() => seekTo(item.start)} 
+                                                className={`p-4 rounded-xl cursor-pointer transition-all border group ${isActive && searchTerm === "" ? 'bg-emerald-50 border-emerald-500/30' : 'bg-white border-slate-100 hover:border-emerald-500/10'}`}>
+                                                <div className="mb-2">
+                                                    <span className={`text-[8px] font-mono px-1.5 py-0.5 rounded ${isActive ? 'bg-[#1E6F54] text-white' : 'bg-slate-100 text-slate-500'}`}>{Math.floor(item.start)}s</span>
                                                 </div>
-                                                <div className="space-y-3 pointer-events-none text-slate-900 font-normal">
-                                                    {showKo && item.ko && <p className="leading-snug transition-all text-slate-800" style={{ fontSize: `${scriptSizeKo}px` }}>{highlightText(item.ko, searchWords)}</p>}
+                                                <div className="space-y-3 pointer-events-none">
+                                                    {showKo && item.ko && <p className="leading-snug" style={{ fontSize: `${scriptSizeKo}px` }}>{highlightText(item.ko, searchWords)}</p>}
                                                     {showZh && item.zh && (
                                                         <div className="space-y-1.5">
-                                                            {showPinyin && item.pinyin && <span className="px-1.5 py-0.5 inline-block text-[11px] rounded transition-all bg-slate-50 text-slate-500 border border-slate-100 font-normal pinyin-font" style={{ fontSize: `${scriptSizeZh * 0.7}px` }}>{highlightText(item.pinyin, searchWords)}</span>}
-                                                            <p className="leading-relaxed transition-all text-slate-800 font-normal" style={{ fontSize: `${scriptSizeZh}px` }}>{highlightText(item.zh, searchWords)}</p>
+                                                            {showPinyin && item.pinyin && <span className="px-1.5 py-0.5 text-[11px] bg-slate-50 text-slate-500 border border-slate-100 pinyin-font" style={{ fontSize: `${scriptSizeZh * 0.7}px` }}>{highlightText(item.pinyin, searchWords)}</span>}
+                                                            <p className="leading-relaxed" style={{ fontSize: `${scriptSizeZh}px` }}>{highlightText(item.zh, searchWords)}</p>
                                                         </div>
                                                     )}
-                                                    {showEn && item.en && <p className="leading-relaxed transition-all text-slate-600 font-normal" style={{ fontSize: `${scriptSizeEn}px` }}>{highlightText(item.en, searchWords)}</p>}
+                                                    {showEn && item.en && <p className="leading-relaxed text-slate-600" style={{ fontSize: `${scriptSizeEn}px` }}>{highlightText(item.en, searchWords)}</p>}
                                                 </div>
                                             </div>
                                         );
                                     })
                                 ) : (
-                                    <div className="text-center py-20 opacity-30 italic text-xs text-slate-900">데이터가 없거나 검색 결과가 없습니다.</div>
+                                    <div className="text-center py-20 opacity-30 italic text-xs">영상을 먼저 연동해주세요.</div>
                                 )}
                             </div>
 
-                            <div className="px-6 py-3 border-t border-slate-100 flex flex-col gap-2 bg-slate-50">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-1.5 text-slate-600 font-black text-[9px] uppercase tracking-widest">
-                                        <Icon name="type" size={12} /> 스크립트 텍스트 크기
+                            <div className="px-6 py-3 border-t border-slate-100 bg-slate-50">
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-1.5 text-slate-600 font-black text-[9px] status-badge uppercase">
+                                        <Icon name="type" size={12} /> 글자 크기
                                     </div>
-                                    <button onClick={() => setAllScriptSize(18)} className="text-[9px] text-[#1E6F54] hover:underline transition-colors font-black status-badge">모두 18px로</button>
+                                    <button onClick={() => setAllScriptSize(18)} className="text-[9px] text-[#1E6F54] hover:underline status-badge">RESET (18PX)</button>
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    {[ {label: 'KO', val: scriptSizeKo, set: setScriptSizeKo}, {label: 'ZH', val: scriptSizeZh, set: setScriptSizeZh}, {label: 'EN', val: scriptSizeEn, set: setScriptSizeEn} ].map((l, i) => (
-                                        <div key={i} className="flex items-center gap-2">
-                                            <span className="text-[9px] font-black text-slate-500 w-4 status-badge">{l.label}</span>
-                                            <input type="range" min="10" max="30" value={l.val} onChange={(e) => l.set(Number(e.target.value))} className="flex-1 h-1" />
-                                            <span className="text-[9px] font-mono text-slate-700 w-3">{l.val}</span>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    {[ {l: 'KO', v: scriptSizeKo, s: setScriptSizeKo}, {l: 'ZH', v: scriptSizeZh, s: setScriptSizeZh}, {l: 'EN', v: scriptSizeEn, s: setScriptSizeEn} ].map((item, idx) => (
+                                        <div key={idx} className="flex items-center gap-2">
+                                            <span className="text-[9px] font-black w-4">{item.l}</span>
+                                            <input type="range" min="10" max="30" value={item.v} onChange={(e) => item.s(Number(e.target.value))} className="flex-1 h-1" />
                                         </div>
                                     ))}
                                 </div>
                             </div>
 
-                            {/* 사전 검색 팝업 */}
                             {dictPopup.show && (
-                                <div 
-                                    className="dict-popup fixed bg-slate-900 text-white rounded-xl px-3 py-1.5 flex items-center gap-3 shadow-2xl border border-white/20 whitespace-nowrap pointer-events-auto"
-                                    style={{ left: dictPopup.x, top: dictPopup.y }}
-                                    onMouseDown={(e) => e.stopPropagation()} 
-                                >
-                                    <span className="text-[10px] font-normal text-emerald-400 truncate max-w-[100px] font-black status-badge">"{dictPopup.text}"</span>
-                                    <div className="w-[1px] h-3 bg-white/20"></div>
-                                    <button onClick={() => openDictionary(dictPopup.text)} className="flex items-center gap-1 bg-[#1E6F54] hover:bg-emerald-500 px-2 py-1 rounded-lg transition-all text-[9px] font-black shadow-lg">
-                                        <Icon name="external" size={10} /> 사전 검색
+                                <div className="dict-popup fixed bg-slate-900 text-white rounded-xl px-3 py-1.5 flex items-center gap-3 shadow-2xl border border-white/20"
+                                    style={{ left: dictPopup.x, top: dictPopup.y }} onMouseDown={(e) => e.stopPropagation()}>
+                                    <span className="text-[10px] text-emerald-400 truncate max-w-[100px] status-badge">"{dictPopup.text}"</span>
+                                    <button onClick={() => openDictionary(dictPopup.text)} className="bg-[#1E6F54] px-2 py-1 rounded-lg text-[9px] flex items-center gap-1">
+                                        <Icon name="external" size={10} /> 사전
                                     </button>
                                 </div>
                             )}
                         </div>
                     </main>
 
-                    {/* 푸터 */}
                     <footer className="h-[30px] px-6 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-400 bg-white">
-                        <div className="flex items-center gap-4 uppercase tracking-widest font-black status-badge">
-                            <span>JW Player Pro v21.0 Archive Sync Edition</span>
+                        <div className="flex items-center gap-4 uppercase status-badge">
+                            <span>JW Player Pro Archive v2.5</span>
                             <div className="flex items-center gap-1 text-emerald-700/60">
-                              <Icon name="sync" size={10} className={syncStatus === 'syncing' ? 'animate-spin' : ''} />
-                              Synced with GitHub Library
+                                <Icon name="sync" size={10} /> {syncStatus === 'ready' ? 'Archive Connected' : 'Wait...'}
                             </div>
                         </div>
-                        <div className="flex items-center gap-4">
-                            <span className="text-emerald-700/50 italic tracking-tight font-black status-badge">Advanced Language Learning System</span>
-                        </div>
+                        <span className="italic">Advanced Video Learning Solution</span>
                     </footer>
                 </div>
             );

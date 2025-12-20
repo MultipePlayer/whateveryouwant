@@ -1,0 +1,44 @@
+name: JW Data Auto Scraper
+
+on:
+  schedule:
+    # 매일 한국 시간 새벽 4시 (UTC 19:00)
+    - cron: '0 19 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  scrape-and-update:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install dependencies
+      run: pip install requests
+
+    # [변경점] 압축 푸는 과정 삭제 -> 바로 스크립트 실행
+    # 스크립트가 알아서 분할 파일들을 읽어들입니다.
+    - name: Run Collector Script
+      run: python collector.py
+
+    # [변경점] 다시 압축하는 과정 삭제 -> 분할 파일만 올림
+    - name: Commit and Push changes
+      run: |
+        git config --global user.name 'JW-Bot'
+        git config --global user.email 'actions@github.com'
+        
+        # 분할된 json 파일들과 인덱스만 저장
+        git add jw_multilingual_data_*.json
+        git add jw_data_index.json
+        
+        # 변경사항이 있을 때만 커밋
+        git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update data [$(date +'%Y-%m-%d')]" && git push)

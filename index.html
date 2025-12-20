@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JW Multiple Player Pro - 아카이브 통합 에디션</title>
+    <title>JW Multiple Player Pro - Auto Archive Edition</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -47,8 +47,12 @@
     <script type="text/babel">
         const { useState, useRef, useEffect, useMemo } = React;
 
-        const apiKey = ""; // Gemini API Key
-        const DEFAULT_ARCHIVE_URL = "https://raw.githubusercontent.com/MultipePlayer/whateveryouwant/refs/heads/main/data/jw_data_index.json";
+        const apiKey = ""; // Gemini API Key (Optional)
+
+        // ⚠️ [수정됨] 사용자분의 GitHub 정보가 반영되었습니다.
+        // 파일을 'data' 폴더에서 밖(Root)으로 꺼내셨다는 가정하에 '/data/' 경로는 제거했습니다.
+        // 혹시 아직 data 폴더 안에 있다면 주소 중간에 /data/를 다시 넣으시면 됩니다.
+        const DEFAULT_ARCHIVE_URL = "https://raw.githubusercontent.com/MultipePlayer/whateveryouwant/main/jw_data_index.json";
 
         const Icon = ({ name, size = 14, className = "" }) => {
             const icons = {
@@ -56,12 +60,10 @@
                 pause: <><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></>,
                 search: <><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></>,
                 list: <><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></>,
-                anchor: <path d="M12 22v-5m0-10V2m0 5a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5z"></path>,
-                sliders: <><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="2" y1="14" x2="6" y2="14"></line><line x1="10" y1="8" x2="14" y2="8"></line><line x1="18" y1="16" x2="22" y2="16"></line></>,
+                anchor: <path d="M12 22v-5m0-10V2m0 5a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5 5 5 5 0 0 1 5-5z"></path>,
                 mouse: <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z M13 13l6 6"></path>,
                 help: <><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></>,
                 globe: <><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></>,
-                alert: <><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></>,
                 sync: <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" />,
                 external: <><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></>,
                 type: <><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line></>
@@ -94,7 +96,6 @@
             const [showZh, setShowZh] = useState(true);
             const [showEn, setShowEn] = useState(true);
             const [showPinyin, setShowPinyin] = useState(true);
-            const [showVideoFontSettings, setShowVideoFontSettings] = useState(false);
             const [clickBehavior, setClickBehavior] = useState('play'); 
             const [searchTerm, setSearchTerm] = useState("");
             
@@ -118,46 +119,64 @@
 
             const [tracks, setTracks] = useState({ ko: [], zh: [], en: [] });
 
-            // 아카이브 데이터 로드 및 인덱싱
+            // [핵심] 아카이브 데이터 로드 및 인덱싱 로직
             useEffect(() => {
                 const syncArchive = async () => {
                     setSyncStatus("syncing");
                     try {
+                        // 1. 인덱스 파일 가져오기
                         const indexRes = await fetch(DEFAULT_ARCHIVE_URL);
                         if (!indexRes.ok) throw new Error("Index load failed");
+                        
                         const fileList = await indexRes.json(); 
-
                         const baseUrl = DEFAULT_ARCHIVE_URL.substring(0, DEFAULT_ARCHIVE_URL.lastIndexOf('/'));
                         let mergedLibrary = {};
 
-                        for (const fileName of fileList) {
+                        // 2. 인덱스에 있는 모든 분할 파일 순회하며 가져오기
+                        // Promise.all로 병렬 처리하여 속도 향상
+                        const promises = fileList.map(async (fileName) => {
                             try {
                                 const chunkRes = await fetch(`${baseUrl}/${fileName}`);
-                                if (chunkRes.ok) {
-                                    const chunkData = await chunkRes.json();
-                                    chunkData.forEach(item => {
-                                        if (item.natural_key) {
-                                            const cleanKey = item.natural_key.replace('_VIDEO', '').toLowerCase();
-                                            const videoData = {
-                                                videoUrl: item.url,
-                                                tracks: {
-                                                    ko: item.scripts?.ko || [],
-                                                    en: item.scripts?.en || [],
-                                                    zh: item.scripts?.cn || item.scripts?.zh || []
-                                                }
-                                            };
-                                            mergedLibrary[cleanKey] = videoData;
-                                            // 매칭 확률을 높이기 위해 원본 키도 저장
-                                            mergedLibrary[item.natural_key.toLowerCase()] = videoData;
+                                if (!chunkRes.ok) return;
+                                const chunkData = await chunkRes.json();
+                                
+                                chunkData.forEach(item => {
+                                    if (item.natural_key) {
+                                        // 검색 키 정규화 (소문자, _VIDEO 제거)
+                                        const cleanKey = item.natural_key.replace('_VIDEO', '').toLowerCase().trim();
+                                        
+                                        const videoData = {
+                                            videoUrl: item.url,
+                                            title: item.title,
+                                            tracks: {
+                                                ko: item.scripts?.ko || [],
+                                                en: item.scripts?.en || [],
+                                                zh: item.scripts?.cn || item.scripts?.zh || []
+                                            }
+                                        };
+
+                                        // 여러 키로 매핑하여 검색 성공률 높임
+                                        mergedLibrary[cleanKey] = videoData;
+                                        mergedLibrary[item.natural_key.toLowerCase()] = videoData;
+                                        // 혹시 모를 pub-code 매칭용
+                                        if(cleanKey.includes('_')) {
+                                            mergedLibrary[cleanKey.split('_')[0]] = videoData;
                                         }
-                                    });
-                                }
-                            } catch (err) { console.warn(`${fileName} 로드 실패`); }
-                        }
+                                    }
+                                });
+                            } catch (err) {
+                                console.warn(`${fileName} 로드 중 일부 실패`);
+                            }
+                        });
+
+                        await Promise.all(promises);
+
+                        console.log(`총 ${Object.keys(mergedLibrary).length}개의 영상 데이터 로드됨`);
                         setDataLibrary(mergedLibrary);
                         setSyncStatus("ready");
+
                     } catch (e) {
-                        console.error("동기화 오류:", e);
+                        console.error("동기화 치명적 오류:", e);
                         setSyncStatus("error");
                     }
                 };
@@ -199,9 +218,16 @@
                 // 1. 아카이브 라이브러리 매칭
                 if (mediaCode) {
                     // 완전 일치 또는 유사 일치 확인
-                    const matched = dataLibrary[mediaCode] || 
-                                    dataLibrary[`pub-${mediaCode}`] || 
-                                    Object.keys(dataLibrary).find(k => k.includes(mediaCode)) ? dataLibrary[Object.keys(dataLibrary).find(k => k.includes(mediaCode))] : null;
+                    let matched = dataLibrary[mediaCode];
+                    
+                    // pub-code 형태 (예: pub-jwbc)로도 찾아보기
+                    if (!matched) matched = dataLibrary[`pub-${mediaCode}`];
+                    
+                    // 키 포함 여부로 넓게 검색 (최후의 수단)
+                    if (!matched) {
+                        const foundKey = Object.keys(dataLibrary).find(k => k.includes(mediaCode));
+                        if(foundKey) matched = dataLibrary[foundKey];
+                    }
 
                     if (matched) {
                         setVideoUrl(matched.videoUrl);
@@ -351,7 +377,6 @@
                 });
             }, [anchorList, searchWords]);
 
-            const setAllVideoFontSize = (size) => { setFontSizeKo(size); setFontSizeZh(size); setFontSizeEn(size); };
             const setAllScriptSize = (size) => { setScriptSizeKo(size); setScriptSizeZh(size); setScriptSizeEn(size); };
 
             return (
@@ -372,9 +397,9 @@
                             </button>
                         </div>
                         <div className="flex items-center gap-2">
-                             <div className={`text-[9px] px-2 py-0.5 rounded-full border flex items-center gap-1.5 status-badge ${syncStatus === 'ready' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+                             <div className={`text-[9px] px-2 py-0.5 rounded-full border flex items-center gap-1.5 status-badge ${syncStatus === 'ready' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : syncStatus === 'error' ? 'bg-red-50 text-red-600 border-red-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
                                 <Icon name="sync" size={10} className={syncStatus === 'syncing' ? 'animate-spin' : ''} />
-                                {syncStatus === 'ready' ? 'DB Ready' : syncStatus === 'syncing' ? 'Syncing...' : 'Pending'}
+                                {syncStatus === 'ready' ? 'DB Ready' : syncStatus === 'syncing' ? 'Syncing...' : syncStatus === 'error' ? 'DB Error' : 'Pending'}
                              </div>
                         </div>
                     </nav>
@@ -560,7 +585,7 @@
                         <div className="flex items-center gap-4 uppercase status-badge">
                             <span>JW Player Pro Archive v2.5</span>
                             <div className="flex items-center gap-1 text-emerald-700/60">
-                                <Icon name="sync" size={10} /> {syncStatus === 'ready' ? 'Archive Connected' : 'Wait...'}
+                                <Icon name="sync" size={10} /> {syncStatus === 'ready' ? 'Archive Connected' : syncStatus === 'error' ? 'Failed' : 'Wait...'}
                             </div>
                         </div>
                         <span className="italic">Advanced Video Learning Solution</span>

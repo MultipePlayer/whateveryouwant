@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Play, Pause, RotateCcw, Search, Globe, Languages, 
   Settings, ExternalLink, List, Repeat, ChevronRight, 
-  Volume2, Maximize, SkipBack, SkipForward, AlertCircle
+  Volume2, Maximize, SkipBack, SkipForward, AlertCircle, RefreshCw
 } from 'lucide-react';
 
 // --- 유틸리티: JW.org URL에서 키 추출 ---
@@ -31,9 +31,14 @@ const extractNaturalKey = (url) => {
   }
 };
 
-// 깃허브 데이터 소스 URL
-const GITHUB_BASE_URL = "https://raw.githubusercontent.com/MultipePlayer/whateveryouwant/refs/heads/main/";
-const INDEX_URL = `${GITHUB_BASE_URL}jw_data_index.json`;
+/**
+ * 깃허브 데이터 소스 URL 설정
+ * 브라우저에서 복사한 경로에 'refs/heads/'가 포함되어 있으면 제거하여 표준 Raw URL로 변환합니다.
+ */
+const RAW_URL_CLEANER = (url) => url.replace('/refs/heads/', '/');
+
+const USER_GITHUB_BASE = "https://raw.githubusercontent.com/MultipePlayer/whateveryouwant/main/";
+const INDEX_URL = RAW_URL_CLEANER(`${USER_GITHUB_BASE}jw_data_index.json`);
 
 const App = () => {
   const [allItems, setAllItems] = useState([]);
@@ -55,56 +60,62 @@ const App = () => {
     cn: useRef([])
   };
 
-  // 데이터 로드: 제공해주신 깃허브 주소를 기본으로 설정
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      setError(null);
-      
-      const fetchOptions = {
-        credentials: 'omit',
-        mode: 'cors'
-      };
-
-      try {
-        console.log("Fetching index from:", INDEX_URL);
-        const response = await fetch(INDEX_URL, fetchOptions);
-        
-        if (!response.ok) {
-          throw new Error(`깃허브에서 인덱스 파일을 불러올 수 없습니다. (Status: ${response.status})`);
-        }
-        
-        const index = await response.json();
-
-        // 각 데이터 청크 로드
-        const allLoaded = await Promise.all(
-          index.map(async (fileName) => {
-            try {
-              const fileUrl = `${GITHUB_BASE_URL}${fileName}`;
-              const res = await fetch(fileUrl, fetchOptions);
-              if (res.ok) return await res.json();
-              return [];
-            } catch (e) {
-              console.warn(`${fileName} 로드 실패:`, e);
-              return [];
-            }
-          })
-        );
-        
-        const flattened = allLoaded.flat().filter(item => item && item.natural_key);
-        setAllItems(flattened);
-        
-        if (flattened.length === 0) {
-          setError("데이터가 비어있습니다. 깃허브 저장소의 JSON 파일 내용을 확인하세요.");
-        }
-      } catch (err) {
-        console.error("데이터 로드 에러:", err);
-        setError(`데이터 동기화 실패: ${err.message}. 깃허브 경로가 올바른지 확인해주세요.`);
-      } finally {
-        setLoading(false);
-      }
+  // 데이터 로드 함수
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    
+    const fetchOptions = {
+      method: 'GET',
+      credentials: 'omit',
+      mode: 'cors',
+      cache: 'no-cache' // 최신 데이터를 위해 캐시 무시
     };
 
+    try {
+      console.log("Fetching index from:", INDEX_URL);
+      const response = await fetch(INDEX_URL, fetchOptions);
+      
+      if (!response.ok) {
+        throw new Error(`인덱스 파일 로드 실패 (HTTP ${response.status}). 경로가 정확한지, 저장소가 Public인지 확인하세요.`);
+      }
+      
+      const index = await response.json();
+
+      if (!Array.isArray(index)) {
+        throw new Error("인덱스 파일 형식이 올바르지 않습니다 (Array 기대됨).");
+      }
+
+      // 각 데이터 청크 로드
+      const allLoaded = await Promise.all(
+        index.map(async (fileName) => {
+          try {
+            const fileUrl = RAW_URL_CLEANER(`${USER_GITHUB_BASE}${fileName}`);
+            const res = await fetch(fileUrl, fetchOptions);
+            if (res.ok) return await res.json();
+            console.error(`${fileName} 로드 실패:`, res.status);
+            return [];
+          } catch (e) {
+            return [];
+          }
+        })
+      );
+      
+      const flattened = allLoaded.flat().filter(item => item && item.natural_key);
+      setAllItems(flattened);
+      
+      if (flattened.length === 0) {
+        setError("불러온 데이터가 없습니다. JSON 파일 내부에 유효한 영상 정보가 있는지 확인하세요.");
+      }
+    } catch (err) {
+      console.error("Data load error:", err);
+      setError(`동기화 실패: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     loadData();
   }, []);
 
@@ -192,7 +203,7 @@ const App = () => {
       <div className="flex items-center justify-center h-screen bg-slate-900 text-white font-sans">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-blue-500 mb-4 mx-auto"></div>
-          <p className="text-slate-400 font-medium tracking-wide">데이터 동기화 중...</p>
+          <p className="text-slate-400 font-medium tracking-wide">GitHub에서 데이터 불러오는 중...</p>
         </div>
       </div>
     );
@@ -203,14 +214,19 @@ const App = () => {
       <div className="flex items-center justify-center h-screen bg-slate-900 text-white p-6">
         <div className="max-w-md text-center bg-slate-800 p-8 rounded-3xl border border-slate-700 shadow-2xl">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-6" />
-          <h2 className="text-2xl font-bold mb-3">연결 실패</h2>
-          <p className="text-slate-400 mb-8 leading-relaxed">{error}</p>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="w-full py-3 bg-blue-600 hover:bg-blue-700 rounded-xl font-bold transition-all shadow-lg"
-          >
-            GitHub 경로 다시 확인
-          </button>
+          <h2 className="text-2xl font-bold mb-3">연결 확인 필요</h2>
+          <p className="text-slate-400 mb-8 leading-relaxed text-sm">{error}</p>
+          <div className="space-y-3">
+            <button 
+              onClick={loadData} 
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2"
+            >
+              <RefreshCw className="w-4 h-4" /> 다시 시도
+            </button>
+            <p className="text-[10px] text-slate-500">
+              Tip: GitHub 저장소가 'Public' 상태인지 확인하세요.
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -238,9 +254,9 @@ const App = () => {
         </form>
 
         <div className="flex gap-2">
-          <div className="px-3 py-1.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-[10px] font-bold rounded-lg flex items-center gap-1.5 border border-green-200 dark:border-green-800">
-            <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-            GitHub Connected
+          <div className="px-3 py-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-[10px] font-bold rounded-lg flex items-center gap-1.5 border border-blue-200 dark:border-blue-800">
+            <Globe className="w-3 h-3" />
+            GitHub Data Source
           </div>
         </div>
       </header>
@@ -251,15 +267,20 @@ const App = () => {
           {!selectedItem ? (
             <div className="flex-1 flex items-center justify-center bg-slate-900">
               <div className="max-w-md text-center p-8">
-                <Globe className="w-16 h-16 mx-auto mb-8 text-blue-500 opacity-40 animate-pulse" />
-                <h2 className="text-2xl font-bold text-white mb-4">학습을 시작하세요</h2>
-                <p className="text-slate-400 mb-10 leading-relaxed">상단 검색창에 학습하고 싶은 영상의 제목을 검색하거나 JW 링크를 붙여넣으세요.</p>
+                <div className="w-20 h-20 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-8 animate-pulse">
+                  <Play className="w-10 h-10 text-blue-500 fill-current" />
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-4">데이터 로드 완료</h2>
+                <p className="text-slate-400 mb-10 leading-relaxed">
+                  총 {allItems.length}개의 영상을 불러왔습니다.<br/>
+                  학습하고 싶은 영상을 선택하거나 검색하세요.
+                </p>
                 <div className="flex flex-wrap gap-2 justify-center">
-                   {allItems.slice(0, 5).map(item => (
+                   {allItems.slice(0, 8).map(item => (
                      <button 
                       key={item.natural_key}
                       onClick={() => setSelectedItem(item)}
-                      className="px-5 py-2.5 bg-slate-800 hover:bg-blue-600 text-xs font-bold rounded-xl text-slate-200 transition-all border border-slate-700 shadow-xl"
+                      className="px-4 py-2 bg-slate-800 hover:bg-blue-600 text-[11px] font-bold rounded-xl text-slate-200 transition-all border border-slate-700 shadow-xl"
                      >
                        {item.title}
                      </button>

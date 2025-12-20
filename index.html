@@ -1,592 +1,460 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JW Multiple Player Pro - Enterprise Edition</title>
-    <!-- React & Libraries -->
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;800&family=Noto+Sans+SC:wght@400;700&display=swap" rel="stylesheet">
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { 
+  Play, Pause, RotateCcw, Search, Globe, Languages, 
+  Settings, ExternalLink, List, Repeat, ChevronRight, 
+  Volume2, Maximize, SkipBack, SkipForward, AlertCircle
+} from 'lucide-react';
+
+// --- 유틸리티: JW.org URL에서 키 추출 ---
+const extractNaturalKey = (url) => {
+  if (!url) return null;
+  const cleanUrl = url.trim();
+  try {
+    const urlObj = new URL(cleanUrl);
+    let key = urlObj.searchParams.get('lank') || urlObj.searchParams.get('item');
+    if (key) return key;
+
+    const pathParts = urlObj.pathname.split('/');
+    const lastPart = pathParts[pathParts.length - 1];
+    if (lastPart && (lastPart.includes('_VIDEO') || lastPart.includes('docid-'))) return lastPart;
+
+    const fileMatch = cleanUrl.match(/([A-Z0-9-]+)_[A-Z]{2}_(\d+)_r/i);
+    if (fileMatch) return `pub-${fileMatch[1].toLowerCase()}_${parseInt(fileMatch[2])}_VIDEO`;
+
+    return null;
+  } catch (e) {
+    const docidMatch = cleanUrl.match(/docid-\d+_\d+_VIDEO/);
+    if (docidMatch) return docidMatch[0];
+    const lankMatch = cleanUrl.match(/lank=([^&]+)/);
+    if (lankMatch) return lankMatch[1];
+    return null;
+  }
+};
+
+// 깃허브 데이터 소스 URL
+const GITHUB_BASE_URL = "https://raw.githubusercontent.com/MultipePlayer/whateveryouwant/refs/heads/main/";
+const INDEX_URL = `${GITHUB_BASE_URL}jw_data_index.json`;
+
+const App = () => {
+  const [allItems, setAllItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [currentLang, setCurrentLang] = useState('ko');
+  const [currentTime, setCurrentTime] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [loopMode, setLoopMode] = useState(false); 
+  const [selectedText, setSelectedText] = useState('');
+  const [selectionPos, setSelectionPos] = useState({ x: 0, y: 0 });
+
+  const videoRef = useRef(null);
+  const subtitleRefs = {
+    ko: useRef([]),
+    en: useRef([]),
+    cn: useRef([])
+  };
+
+  // 데이터 로드: 제공해주신 깃허브 주소를 기본으로 설정
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      setError(null);
+      
+      const fetchOptions = {
+        credentials: 'omit',
+        mode: 'cors'
+      };
+
+      try {
+        console.log("Fetching index from:", INDEX_URL);
+        const response = await fetch(INDEX_URL, fetchOptions);
+        
+        if (!response.ok) {
+          throw new Error(`깃허브에서 인덱스 파일을 불러올 수 없습니다. (Status: ${response.status})`);
+        }
+        
+        const index = await response.json();
+
+        // 각 데이터 청크 로드
+        const allLoaded = await Promise.all(
+          index.map(async (fileName) => {
+            try {
+              const fileUrl = `${GITHUB_BASE_URL}${fileName}`;
+              const res = await fetch(fileUrl, fetchOptions);
+              if (res.ok) return await res.json();
+              return [];
+            } catch (e) {
+              console.warn(`${fileName} 로드 실패:`, e);
+              return [];
+            }
+          })
+        );
+        
+        const flattened = allLoaded.flat().filter(item => item && item.natural_key);
+        setAllItems(flattened);
+        
+        if (flattened.length === 0) {
+          setError("데이터가 비어있습니다. 깃허브 저장소의 JSON 파일 내용을 확인하세요.");
+        }
+      } catch (err) {
+        console.error("데이터 로드 에러:", err);
+        setError(`데이터 동기화 실패: ${err.message}. 깃허브 경로가 올바른지 확인해주세요.`);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  const getActiveIndex = (script) => {
+    if (!script || script.length === 0) return -1;
+    let index = -1;
+    for (let i = 0; i < script.length; i++) {
+      if (currentTime >= script[i].start) {
+        index = i;
+      } else {
+        break;
+      }
+    }
+    return index;
+  };
+
+  const activeIdx = useMemo(() => getActiveIndex(selectedItem?.scripts?.ko), [currentTime, selectedItem]);
+
+  const onTimeUpdate = () => {
+    if (!videoRef.current) return;
+    const v = videoRef.current;
+    setCurrentTime(v.currentTime);
+
+    if (loopMode && selectedItem?.scripts?.ko) {
+      const script = selectedItem.scripts.ko;
+      const currentIdx = getActiveIndex(script);
+      if (currentIdx !== -1) {
+        const startTime = script[currentIdx].start;
+        const endTime = script[currentIdx + 1]?.start || v.duration;
+        if (v.currentTime >= endTime - 0.2) {
+          v.currentTime = startTime;
+        }
+      }
+    }
+  };
+
+  const handleSearch = (e) => {
+    if (e) e.preventDefault();
+    if (!searchQuery.trim()) return;
+
+    const key = extractNaturalKey(searchQuery);
+    if (key) {
+      const item = allItems.find(i => 
+        i.natural_key === key || 
+        (i.url && i.url.includes(key)) ||
+        (i.natural_key && key.includes(i.natural_key))
+      );
+      if (item) {
+        setSelectedItem(item);
+        setSearchQuery('');
+        return;
+      }
+    }
     
-    <style>
-        :root { --primary: #1E6F54; --primary-light: #f0fdf4; }
-        body { background-color: #f8fafc; font-family: 'Pretendard', sans-serif; height: 100vh; overflow: hidden; }
+    const item = allItems.find(i => i.title.toLowerCase().includes(searchQuery.toLowerCase()));
+    if (item) {
+      setSelectedItem(item);
+      setSearchQuery('');
+    }
+  };
+
+  const handleMouseUp = (e) => {
+    const selection = window.getSelection().toString().trim();
+    if (selection && selection.length < 50) {
+      setSelectedText(selection);
+      setSelectionPos({ x: e.clientX, y: e.clientY - 60 });
+    } else {
+      setSelectedText('');
+    }
+  };
+
+  useEffect(() => {
+    if (activeIdx !== -1) {
+      ['ko', 'en', 'cn'].forEach(lang => {
+        const el = subtitleRefs[lang].current[activeIdx];
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      });
+    }
+  }, [activeIdx]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-slate-900 text-white font-sans">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-blue-500 mb-4 mx-auto"></div>
+          <p className="text-slate-400 font-medium tracking-wide">데이터 동기화 중...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-slate-900 text-white p-6">
+        <div className="max-w-md text-center bg-slate-800 p-8 rounded-3xl border border-slate-700 shadow-2xl">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-6" />
+          <h2 className="text-2xl font-bold mb-3">연결 실패</h2>
+          <p className="text-slate-400 mb-8 leading-relaxed">{error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="w-full py-3 bg-blue-600 hover:bg-blue-700 rounded-xl font-bold transition-all shadow-lg"
+          >
+            GitHub 경로 다시 확인
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 overflow-hidden font-sans">
+      
+      {/* Header */}
+      <header className="h-16 border-b bg-white dark:bg-slate-900 flex items-center justify-between px-6 shrink-0 z-20 shadow-sm border-slate-200 dark:border-slate-800">
+        <div className="flex items-center gap-2">
+          <div className="w-9 h-9 bg-gradient-to-tr from-blue-700 to-blue-500 rounded-xl flex items-center justify-center text-white font-black shadow-lg shadow-blue-500/20">JW</div>
+          <h1 className="font-bold text-lg hidden sm:block tracking-tight">Language Player</h1>
+        </div>
         
-        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { border-radius: 10px; background: #cbd5e1; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #1E6F54; }
-        
-        .pinyin-font { font-family: "Noto Sans SC", sans-serif; }
-        
-        mark { background-color: #fef08a; color: #854d0e; padding: 0 2px; border-radius: 2px; }
-        
-        .text-outline {
-            text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 3px 6px rgba(0,0,0,0.8);
-        }
+        <form onSubmit={handleSearch} className="flex-1 max-w-2xl mx-6 relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input 
+            type="text"
+            placeholder="제목 혹은 JW 링크를 입력하세요..."
+            className="w-full bg-slate-100 dark:bg-slate-800 border border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-slate-700 rounded-full py-2.5 pl-11 pr-4 transition-all outline-none text-sm shadow-inner"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </form>
 
-        .loading-spinner {
-            border: 2px solid rgba(30, 111, 84, 0.1); border-top: 2px solid #1E6F54;
-            border-radius: 50%; width: 14px; height: 14px; animation: spin 1s linear infinite;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        <div className="flex gap-2">
+          <div className="px-3 py-1.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-[10px] font-bold rounded-lg flex items-center gap-1.5 border border-green-200 dark:border-green-800">
+            <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+            GitHub Connected
+          </div>
+        </div>
+      </header>
 
-        .active-script-card {
-            border-color: var(--primary) !important;
-            background-color: white !important;
-            box-shadow: 0 10px 25px -5px rgba(30, 111, 84, 0.1), 0 8px 10px -6px rgba(30, 111, 84, 0.1);
-        }
-
-        /* Slider Customization */
-        input[type=range] { -webkit-appearance: none; background: transparent; }
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none; height: 14px; width: 14px; border-radius: 50%;
-            background: #1E6F54; margin-top: -5px; box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-        }
-        input[type=range]::-webkit-slider-runnable-track {
-            width: 100%; height: 4px; background: #e2e8f0; border-radius: 2px;
-        }
-    </style>
-</head>
-<body>
-    <div id="root" class="h-full flex flex-col"></div>
-
-    <!-- Firebase SDKs -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Firebase Setup - Environment provided variables
-        const firebaseConfig = JSON.parse(__firebase_config);
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'jw-pro-v1';
-
-        window.FB = { db, auth, appId, doc, setDoc, getDoc, collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, serverTimestamp, signInAnonymously, signInWithCustomToken, onAuthStateChanged };
-    </script>
-
-    <script type="text/babel">
-        const { useState, useRef, useEffect, useMemo, useCallback } = React;
-
-        // Icons Component
-        const Icon = ({ name, size = 16, className = "" }) => {
-            const icons = {
-                play: <path d="M5 3l14 9-14 9V3z" />,
-                pause: <path d="M6 4h4v16H6zM14 4h4v16h-4z" />,
-                search: <circle cx="11" cy="11" r="8"></circle>,
-                list: <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />,
-                settings: <circle cx="12" cy="12" r="3"></circle>,
-                star: <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />,
-                external: <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3" />,
-                globe: <circle cx="12" cy="12" r="10"></circle>,
-                history: <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            };
-            return (
-                <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
-                    {icons[name] || null}
-                    {name === 'search' && <line x1="21" y1="21" x2="16.65" y2="16.65" />}
-                    {name === 'settings' && <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />}
-                </svg>
-            );
-        };
-
-        const DEFAULT_INDEX_URL = "https://raw.githubusercontent.com/MultipePlayer/whateveryouwant/main/jw_data_index.json";
-        const apiKey = ""; // Runtime provides key
-
-        const App = () => {
-            // -- Core State --
-            const [user, setUser] = useState(null);
-            const [videoUrl, setVideoUrl] = useState("https://www.w3schools.com/html/mov_bbb.mp4");
-            const [videoTitle, setVideoTitle] = useState("Sample Video");
-            const [inputUrl, setInputUrl] = useState("");
-            const [tracks, setTracks] = useState({ ko: [], zh: [], en: [] });
-            const [currentTime, setCurrentTime] = useState(0);
-            const [duration, setDuration] = useState(0);
-            const [isPlaying, setIsPlaying] = useState(false);
-            const [playbackRate, setPlaybackRate] = useState(1.0);
-            const [isSyncing, setIsSyncing] = useState(false);
-
-            // -- UI Settings --
-            const [anchorLang, setAnchorLang] = useState('ko');
-            const [visibility, setVisibility] = useState({ ko: true, zh: true, en: true, pinyin: true });
-            const [searchTerm, setSearchTerm] = useState("");
-            const [fontSize, setFontSize] = useState({ video: 22, script: 16 });
-            const [isLooping, setIsLooping] = useState(false);
-            const [loopPoints, setLoopPoints] = useState({ a: null, b: null });
-            const [dataLibrary, setDataLibrary] = useState({});
-            const [history, setHistory] = useState([]);
-
-            const videoRef = useRef(null);
-            const scrollRef = useRef(null);
-            const scriptRefs = useRef([]);
-            const [dictPopup, setDictPopup] = useState({ show: false, x: 0, y: 0, text: "" });
-
-            // -- Firebase Integration --
-            useEffect(() => {
-                const initAuth = async () => {
-                    const { auth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } = window.FB;
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        await signInWithCustomToken(auth, __initial_auth_token);
-                    } else {
-                        await signInAnonymously(auth);
-                    }
-                };
-                initAuth();
-                const unsub = window.FB.onAuthStateChanged(window.FB.auth, setUser);
-                return () => unsub();
-            }, []);
-
-            useEffect(() => {
-                if (!user) return;
-                const { db, appId, query, collection, onSnapshot } = window.FB;
-                const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'history'));
-                const unsub = onSnapshot(q, (snapshot) => {
-                    const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    setHistory(items.sort((a, b) => b.timestamp?.seconds - a.timestamp?.seconds));
-                }, (err) => console.error(err));
-                return () => unsub();
-            }, [user]);
-
-            // -- Data Archiving --
-            useEffect(() => {
-                const fetchArchive = async () => {
-                    try {
-                        const res = await fetch(DEFAULT_INDEX_URL);
-                        const files = await res.json();
-                        const base = DEFAULT_INDEX_URL.substring(0, DEFAULT_INDEX_URL.lastIndexOf('/'));
-                        let lib = {};
-                        await Promise.all(files.map(async f => {
-                            try {
-                                const cRes = await fetch(`${base}/${f}`);
-                                const data = await cRes.json();
-                                data.forEach(item => {
-                                    if (item.natural_key) {
-                                        const key = item.natural_key.toLowerCase();
-                                        const val = { url: item.url, title: item.title, tracks: { ko: item.scripts?.ko || [], en: item.scripts?.en || [], zh: item.scripts?.cn || item.scripts?.zh || [] } };
-                                        lib[key] = val;
-                                        if (key.includes('_video')) lib[key.replace('_video', '')] = val;
-                                    }
-                                });
-                            } catch(e){}
-                        }));
-                        setDataLibrary(lib);
-                    } catch(e){}
-                };
-                fetchArchive();
-            }, []);
-
-            // -- Logic Handlers --
-            const callGemini = async (prompt) => {
-                let delay = 1000;
-                for (let i = 0; i < 5; i++) {
-                    try {
-                        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], tools: [{ "google_search": {} }] })
-                        });
-                        if (!response.ok) throw new Error("Retry");
-                        return await response.json();
-                    } catch (e) {
-                        await new Promise(r => setTimeout(r, delay));
-                        delay *= 2;
-                    }
-                }
-                throw new Error("API Failed");
-            };
-
-            const handleAnalyzeUrl = async () => {
-                if (!inputUrl) return;
-                setIsSyncing(true);
-                
-                // 1. Library Check First
-                const cleanInput = inputUrl.toLowerCase().trim();
-                const matched = Object.keys(dataLibrary).find(k => cleanInput.includes(k));
-                if (matched) {
-                    const data = dataLibrary[matched];
-                    setVideoUrl(data.url);
-                    setVideoTitle(data.title);
-                    setTracks(data.tracks);
-                    saveToHistory(data.title, inputUrl);
-                    setIsSyncing(false);
-                    return;
-                }
-
-                // 2. Gemini Analysis
-                try {
-                    const prompt = `주소: "${inputUrl}". 이 영상의 원본 mp4 주소와 한국어(ko), 중국어(zh), 영어(en) 자막 정보를 JSON으로 추출해줘. {videoUrl: string, title: string, tracks: {ko: [{start: number, end: number, text: string}], zh: [...], en: [...]}} 형식만 응답해.`;
-                    const res = await callGemini(prompt);
-                    const text = res.candidates?.[0]?.content?.parts?.[0]?.text;
-                    const jsonStr = text.match(/\{[\s\S]*\}/)?.[0];
-                    if (jsonStr) {
-                        const data = JSON.parse(jsonStr);
-                        setVideoUrl(data.videoUrl);
-                        setVideoTitle(data.title || "External Video");
-                        setTracks(data.tracks || { ko: [], zh: [], en: [] });
-                        saveToHistory(data.title || "External Video", inputUrl);
-                    }
-                } catch (e) {
-                    console.error("Gemini Failed:", e);
-                } finally {
-                    setIsSyncing(false);
-                }
-            };
-
-            const saveToHistory = async (title, url) => {
-                if (!user) return;
-                const { db, appId, collection, addDoc, serverTimestamp } = window.FB;
-                await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'history'), {
-                    title, url, timestamp: serverTimestamp()
-                });
-            };
-
-            const togglePlay = () => {
-                if (!videoRef.current) return;
-                if (videoRef.current.paused) { videoRef.current.play(); setIsPlaying(true); }
-                else { videoRef.current.pause(); setIsPlaying(false); }
-            };
-
-            const handleTimeUpdate = () => {
-                if (!videoRef.current) return;
-                const time = videoRef.current.currentTime;
-                setCurrentTime(time);
-                if (isLooping && loopPoints.a !== null && loopPoints.b !== null && time >= loopPoints.b) {
-                    videoRef.current.currentTime = loopPoints.a;
-                }
-            };
-
-            const currentSubtitles = useMemo(() => {
-                const find = (t) => tracks[t]?.find(s => currentTime >= s.start && currentTime < s.end);
-                return { ko: find('ko'), zh: find('zh'), en: find('en') };
-            }, [currentTime, tracks]);
-
-            const integratedList = useMemo(() => {
-                const base = tracks[anchorLang] || [];
-                return base.map((item, idx) => {
-                    const overlap = (lang) => {
-                        const found = tracks[lang]?.filter(s => s.start < item.end && s.end > item.start);
-                        return found?.map(f => f.text).join(' ');
-                    };
-                    const overlapPinyin = () => {
-                        const found = tracks.zh?.filter(s => s.start < item.end && s.end > item.start);
-                        return found?.map(f => f.pinyin).filter(Boolean).join(' ');
-                    };
-                    return {
-                        id: idx, start: item.start, end: item.end,
-                        ko: anchorLang === 'ko' ? item.text : overlap('ko'),
-                        zh: anchorLang === 'zh' ? item.text : overlap('zh'),
-                        en: anchorLang === 'en' ? item.text : overlap('en'),
-                        pinyin: anchorLang === 'zh' ? item.pinyin : overlapPinyin()
-                    };
-                });
-            }, [tracks, anchorLang]);
-
-            const filteredList = useMemo(() => {
-                if (!searchTerm) return integratedList;
-                const s = searchTerm.toLowerCase();
-                return integratedList.filter(i => 
-                    i.ko?.toLowerCase().includes(s) || i.zh?.toLowerCase().includes(s) || i.en?.toLowerCase().includes(s)
-                );
-            }, [integratedList, searchTerm]);
-
-            useEffect(() => {
-                if (searchTerm) return;
-                const activeIdx = integratedList.findIndex(i => currentTime >= i.start && currentTime < i.end);
-                if (activeIdx !== -1 && scriptRefs.current[activeIdx] && scrollRef.current) {
-                    const el = scriptRefs.current[activeIdx];
-                    scrollRef.current.scrollTo({ top: el.offsetTop - 150, behavior: 'smooth' });
-                }
-            }, [currentTime, integratedList, searchTerm]);
-
-            const handleTextSelect = () => {
-                const selection = window.getSelection().toString().trim();
-                if (selection) {
-                    const rect = window.getSelection().getRangeAt(0).getBoundingClientRect();
-                    setDictPopup({ show: true, x: rect.left, y: rect.top - 45, text: selection });
-                }
-            };
-
-            return (
-                <div className="flex flex-col h-full overflow-hidden bg-slate-50" onMouseUp={handleTextSelect}>
-                    {/* Navigation */}
-                    <nav className="h-14 bg-white border-b px-6 flex items-center justify-between z-50 shrink-0">
-                        <div className="flex items-center gap-3">
-                            <div className="bg-[#1E6F54] w-8 h-8 rounded-xl flex items-center justify-center text-white shadow-lg">
-                                <Icon name="play" size={16} />
-                            </div>
-                            <div>
-                                <h1 className="text-sm font-black text-slate-900 tracking-tight uppercase leading-none">JW Pro</h1>
-                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Enterprise v2.5</span>
-                            </div>
-                        </div>
-
-                        <div className="flex-1 max-w-2xl mx-10 flex gap-2">
-                            <div className="relative flex-1">
-                                <Icon name="globe" size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                                <input 
-                                    type="text" 
-                                    className="w-full bg-slate-100 border-none rounded-xl py-2 pl-10 pr-4 text-xs font-semibold focus:ring-2 focus:ring-[#1E6F54] transition-all"
-                                    placeholder="Enter Video URL or Code (e.g., pub-mwbv_202411_1)"
-                                    value={inputUrl}
-                                    onChange={(e) => setInputUrl(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleAnalyzeUrl()}
-                                />
-                            </div>
-                            <button 
-                                onClick={handleAnalyzeUrl}
-                                disabled={isSyncing}
-                                className="bg-[#1E6F54] text-white px-5 rounded-xl text-xs font-bold hover:bg-[#165a44] transition-all flex items-center gap-2 disabled:opacity-50"
-                            >
-                                {isSyncing ? <div className="loading-spinner"></div> : "연동하기"}
-                            </button>
-                        </div>
-
-                        <div className="flex items-center gap-4">
-                            <div className="hidden md:block text-right">
-                                <p className="text-[10px] font-black text-slate-400 uppercase leading-none mb-1">Status</p>
-                                <p className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
-                                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> Ready
-                                </p>
-                            </div>
-                        </div>
-                    </nav>
-
-                    {/* Main Content */}
-                    <main className="flex-1 flex overflow-hidden p-4 gap-4 max-w-[1800px] mx-auto w-full">
-                        {/* Video Column (42%) */}
-                        <div className="w-[42%] flex flex-col gap-4 overflow-y-auto custom-scrollbar pb-10">
-                            {/* Video Container */}
-                            <div className="relative aspect-video bg-black rounded-[2rem] overflow-hidden shadow-2xl border-4 border-white group">
-                                <video 
-                                    ref={videoRef}
-                                    src={videoUrl}
-                                    className="w-full h-full object-contain"
-                                    onClick={togglePlay}
-                                    onTimeUpdate={handleTimeUpdate}
-                                    onLoadedMetadata={(e) => setDuration(e.target.duration)}
-                                    autoPlay
-                                />
-
-                                {/* Subtitle Overlays */}
-                                <div className="absolute inset-x-0 bottom-0 p-8 pointer-events-none z-20 flex flex-col items-center justify-end">
-                                    <div className="bg-black/50 backdrop-blur-md px-6 py-4 rounded-3xl text-center space-y-2 border border-white/10 shadow-2xl">
-                                        {visibility.ko && currentSubtitles.ko && (
-                                            <p className="text-white font-bold leading-snug text-outline" style={{ fontSize: `${fontSize.video}px` }}>
-                                                {currentSubtitles.ko.text}
-                                            </p>
-                                        )}
-                                        {visibility.zh && currentSubtitles.zh && (
-                                            <div className="flex flex-col items-center">
-                                                {visibility.pinyin && currentSubtitles.zh.pinyin && (
-                                                    <p className="text-emerald-300 pinyin-font font-bold mb-1 opacity-90" style={{ fontSize: `${fontSize.video * 0.6}px` }}>
-                                                        {currentSubtitles.zh.pinyin}
-                                                    </p>
-                                                )}
-                                                <p className="text-white font-bold leading-snug text-outline" style={{ fontSize: `${fontSize.video}px` }}>
-                                                    {currentSubtitles.zh.text}
-                                                </p>
-                                            </div>
-                                        )}
-                                        {visibility.en && currentSubtitles.en && (
-                                            <p className="text-yellow-200 font-bold leading-tight text-outline opacity-90" style={{ fontSize: `${fontSize.video * 0.85}px` }}>
-                                                {currentSubtitles.en.text}
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Player Controls */}
-                            <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-200 space-y-6">
-                                <div className="flex items-center gap-5">
-                                    <button onClick={togglePlay} className="w-14 h-14 bg-[#1E6F54] text-white rounded-2xl flex items-center justify-center shadow-lg active:scale-95 transition-all">
-                                        <Icon name={isPlaying ? "pause" : "play"} size={24} />
-                                    </button>
-                                    <div className="flex-1">
-                                        <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
-                                            <span>{videoTitle}</span>
-                                            <span>{Math.floor(currentTime)} / {Math.floor(duration)}s</span>
-                                        </div>
-                                        <div className="relative h-2 bg-slate-100 rounded-full cursor-pointer" onClick={(e) => {
-                                            const r = e.currentTarget.getBoundingClientRect();
-                                            videoRef.current.currentTime = ((e.clientX - r.left) / r.width) * duration;
-                                        }}>
-                                            <div className="absolute h-full bg-[#1E6F54] rounded-full" style={{ width: `${(currentTime/duration)*100}%` }}></div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-6 pt-4 border-t border-slate-100">
-                                    <div className="space-y-3">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Visibility</label>
-                                        <div className="flex gap-1 p-1 bg-slate-50 rounded-xl">
-                                            {['ko', 'zh', 'en'].map(l => (
-                                                <button 
-                                                    key={l} 
-                                                    onClick={() => setVisibility(v => ({ ...v, [l]: !v[l] }))}
-                                                    className={`flex-1 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${visibility[l] ? 'bg-white text-[#1E6F54] shadow-sm' : 'text-slate-300'}`}
-                                                >
-                                                    {l}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div className="space-y-3">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Subtitle Size</label>
-                                        <div className="flex items-center gap-4">
-                                            <input type="range" min="14" max="40" value={fontSize.video} onChange={(e) => setFontSize(f => ({ ...f, video: Number(e.target.value) }))} className="flex-1" />
-                                            <span className="text-xs font-mono font-bold w-5">{fontSize.video}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="flex gap-4 pt-4">
-                                    <div className="flex-1 p-1 bg-slate-50 rounded-xl flex gap-1">
-                                        {[0.8, 1.0, 1.2, 1.5].map(r => (
-                                            <button 
-                                                key={r} 
-                                                onClick={() => { videoRef.current.playbackRate = r; setPlaybackRate(r); }}
-                                                className={`flex-1 py-2 rounded-lg text-[10px] font-black transition-all ${playbackRate === r ? 'bg-white text-[#1E6F54] shadow-sm' : 'text-slate-400'}`}
-                                            >
-                                                {r}x
-                                            </button>
-                                        ))}
-                                    </div>
-                                    <div className="flex gap-1">
-                                        <button onClick={() => setLoopPoints(p => ({ ...p, a: currentTime }))} className={`px-4 py-2 rounded-xl text-[10px] font-black ${loopPoints.a !== null ? 'bg-emerald-100 text-[#1E6F54]' : 'bg-slate-50 text-slate-400'}`}>A</button>
-                                        <button onClick={() => setLoopPoints(p => ({ ...p, b: currentTime }))} className={`px-4 py-2 rounded-xl text-[10px] font-black ${loopPoints.b !== null ? 'bg-emerald-100 text-[#1E6F54]' : 'bg-slate-50 text-slate-400'}`}>B</button>
-                                        <button onClick={() => setIsLooping(!isLooping)} className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all ${isLooping ? 'bg-[#1E6F54] text-white shadow-lg' : 'bg-slate-50 text-slate-400'}`}>LOOP</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Script Column (58%) */}
-                        <div className="flex-1 bg-white rounded-[2rem] shadow-sm border border-slate-200 flex flex-col overflow-hidden">
-                            {/* Script Header */}
-                            <div className="p-6 border-b bg-slate-50/50 space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <Icon name="list" size={20} className="text-[#1E6F54]" />
-                                        <h2 className="text-sm font-black text-slate-900 uppercase tracking-tight">Interactive Scripts</h2>
-                                    </div>
-                                    <div className="flex items-center gap-2 bg-white px-2 py-1 rounded-xl shadow-sm border">
-                                        <button onClick={() => setFontSize(f => ({ ...f, script: Math.max(12, f.script - 1) }))} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-50 text-slate-400">－</button>
-                                        <span className="text-xs font-mono font-bold w-6 text-center">{fontSize.script}</span>
-                                        <button onClick={() => setFontSize(f => ({ ...f, script: Math.min(24, f.script + 1) }))} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-50 text-slate-400">＋</button>
-                                    </div>
-                                </div>
-
-                                <div className="flex gap-3">
-                                    <div className="flex-1 relative">
-                                        <Icon name="search" size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                                        <input 
-                                            type="text" 
-                                            placeholder="Search scripts..." 
-                                            className="w-full bg-white border border-slate-200 rounded-xl py-2 pl-10 pr-4 text-xs font-semibold focus:ring-1 focus:ring-[#1E6F54] outline-none"
-                                            value={searchTerm}
-                                            onChange={(e) => setSearchTerm(e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="flex gap-1 p-1 bg-white border border-slate-200 rounded-xl">
-                                        {['ko', 'zh', 'en'].map(l => (
-                                            <button 
-                                                key={l}
-                                                onClick={() => setAnchorLang(l)}
-                                                className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${anchorLang === l ? 'bg-[#1E6F54] text-white' : 'text-slate-400 hover:text-slate-600'}`}
-                                            >
-                                                {l}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Script List */}
-                            <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar bg-slate-50/20">
-                                {filteredList.length > 0 ? filteredList.map((item, idx) => {
-                                    const isActive = currentTime >= item.start && currentTime < item.end;
-                                    return (
-                                        <div 
-                                            key={idx}
-                                            ref={el => scriptRefs.current[idx] = el}
-                                            onClick={() => { videoRef.current.currentTime = item.start; videoRef.current.play(); setIsPlaying(true); }}
-                                            className={`p-6 rounded-[1.5rem] border-2 cursor-pointer transition-all duration-300 relative group ${isActive ? 'active-script-card border-emerald-500 scale-[1.01]' : 'bg-white border-transparent hover:border-slate-200 shadow-sm'}`}
-                                        >
-                                            <div className="absolute top-4 right-6">
-                                                <span className={`text-[9px] font-mono font-black px-2 py-0.5 rounded-full ${isActive ? 'bg-[#1E6F54] text-white' : 'bg-slate-100 text-slate-400'}`}>
-                                                    {Math.floor(item.start)}s
-                                                </span>
-                                            </div>
-
-                                            <div className="space-y-4 pr-12">
-                                                {/* Anchor Language (Large) */}
-                                                <div className="border-l-4 border-[#1E6F54] pl-4">
-                                                    <p className="text-slate-800 font-bold leading-relaxed" style={{ fontSize: `${fontSize.script}px` }}>
-                                                        {item[anchorLang] ? <span dangerouslySetInnerHTML={{ __html: item[anchorLang].replace(new RegExp(`(${searchTerm})`, 'gi'), '<mark>$1</mark>') }} /> : <span className="text-slate-300 italic">...</span>}
-                                                    </p>
-                                                    {anchorLang === 'zh' && visibility.pinyin && item.pinyin && (
-                                                        <p className="text-slate-400 pinyin-font mt-2 font-medium" style={{ fontSize: `${fontSize.script * 0.75}px` }}>
-                                                            {item.pinyin}
-                                                        </p>
-                                                    )}
-                                                </div>
-
-                                                {/* Other Languages (Smaller) */}
-                                                <div className="grid grid-cols-1 gap-3 pl-5 opacity-70 group-hover:opacity-100 transition-opacity">
-                                                    {anchorLang !== 'ko' && visibility.ko && item.ko && (
-                                                        <p className="text-slate-500 font-semibold" style={{ fontSize: `${fontSize.script * 0.9}px` }}>{item.ko}</p>
-                                                    )}
-                                                    {anchorLang !== 'zh' && visibility.zh && item.zh && (
-                                                        <div className="space-y-1">
-                                                            {visibility.pinyin && item.pinyin && <p className="text-slate-400 pinyin-font" style={{ fontSize: `${fontSize.script * 0.7}px` }}>{item.pinyin}</p>}
-                                                            <p className="text-slate-500 font-semibold" style={{ fontSize: `${fontSize.script * 0.9}px` }}>{item.zh}</p>
-                                                        </div>
-                                                    )}
-                                                    {anchorLang !== 'en' && visibility.en && item.en && (
-                                                        <p className="text-slate-500 font-semibold italic" style={{ fontSize: `${fontSize.script * 0.85}px` }}>{item.en}</p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                }) : (
-                                    <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-4 opacity-40">
-                                        <Icon name="search" size={48} />
-                                        <p className="text-xs font-black uppercase tracking-[0.2em]">No Matches Found</p>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </main>
-
-                    {/* Dictionary Popup */}
-                    {dictPopup.show && (
-                        <div 
-                            className="fixed z-[100] bg-slate-900 text-white rounded-2xl px-5 py-3 shadow-2xl flex items-center gap-4 border border-white/10 animate-in fade-in zoom-in slide-in-from-bottom-2 duration-150"
-                            style={{ left: Math.min(window.innerWidth - 250, dictPopup.x), top: dictPopup.y }}
-                        >
-                            <span className="text-xs font-bold text-emerald-400 max-w-[120px] truncate">"{dictPopup.text}"</span>
-                            <div className="w-px h-4 bg-white/20"></div>
-                            <button 
-                                onClick={() => window.open(`https://zh.dict.naver.com/#/search?query=${encodeURIComponent(dictPopup.text)}`, '_blank')}
-                                className="bg-[#1E6F54] hover:bg-emerald-600 px-4 py-1.5 rounded-xl text-[10px] font-black flex items-center gap-2 transition-all"
-                            >
-                                <Icon name="external" size={10} /> DICTIONARY
-                            </button>
-                        </div>
-                    )}
+      <main className="flex-1 flex overflow-hidden">
+        {/* Left Section: Video Player */}
+        <div className="flex-1 flex flex-col min-w-0 bg-black relative">
+          {!selectedItem ? (
+            <div className="flex-1 flex items-center justify-center bg-slate-900">
+              <div className="max-w-md text-center p-8">
+                <Globe className="w-16 h-16 mx-auto mb-8 text-blue-500 opacity-40 animate-pulse" />
+                <h2 className="text-2xl font-bold text-white mb-4">학습을 시작하세요</h2>
+                <p className="text-slate-400 mb-10 leading-relaxed">상단 검색창에 학습하고 싶은 영상의 제목을 검색하거나 JW 링크를 붙여넣으세요.</p>
+                <div className="flex flex-wrap gap-2 justify-center">
+                   {allItems.slice(0, 5).map(item => (
+                     <button 
+                      key={item.natural_key}
+                      onClick={() => setSelectedItem(item)}
+                      className="px-5 py-2.5 bg-slate-800 hover:bg-blue-600 text-xs font-bold rounded-xl text-slate-200 transition-all border border-slate-700 shadow-xl"
+                     >
+                       {item.title}
+                     </button>
+                   ))}
                 </div>
-            );
-        };
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex-1 relative flex items-center justify-center overflow-hidden group">
+                <video 
+                  ref={videoRef}
+                  src={selectedItem.url}
+                  className="max-w-full max-h-full shadow-2xl"
+                  onTimeUpdate={onTimeUpdate}
+                  onPlay={() => setIsPlaying(true)}
+                  onPause={() => setIsPlaying(false)}
+                  autoPlay
+                />
+                
+                {/* Floating Subtitles Overlay */}
+                <div className="absolute bottom-16 left-0 right-0 px-10 pointer-events-none select-none">
+                  <div className="bg-black/60 backdrop-blur-xl text-white p-6 rounded-[2rem] text-center mx-auto max-w-4xl border border-white/10 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)]">
+                    <p className="text-3xl font-bold mb-3 tracking-tight leading-snug">
+                      {selectedItem.scripts[currentLang]?.[activeIdx]?.text}
+                    </p>
+                    {currentLang !== 'ko' && (
+                      <p className="text-xl text-slate-300 font-semibold opacity-90">
+                        {selectedItem.scripts['ko']?.[activeIdx]?.text}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-</body>
-</html>
+              {/* Player UI Controls */}
+              <div className="bg-slate-900 text-white p-4 pb-8 shrink-0 border-t border-slate-800 shadow-2xl z-10">
+                <div className="max-w-5xl mx-auto">
+                  <div className="flex items-center gap-4 mb-4">
+                    <span className="text-[10px] font-mono text-slate-500 w-12 tabular-nums">
+                      {new Date(currentTime * 1000).toISOString().substr(14, 5)}
+                    </span>
+                    <div 
+                      className="flex-1 h-2 bg-slate-700 rounded-full relative cursor-pointer overflow-hidden group"
+                      onClick={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const pos = (e.clientX - rect.left) / rect.width;
+                        videoRef.current.currentTime = pos * videoRef.current.duration;
+                      }}
+                    >
+                      <div 
+                        className="absolute left-0 top-0 h-full bg-blue-500 rounded-full transition-all duration-75" 
+                        style={{ width: `${(currentTime / (videoRef.current?.duration || 1)) * 100}%` }}
+                      />
+                    </div>
+                    <span className="text-[10px] font-mono text-slate-500 w-12 tabular-nums">
+                      {new Date((videoRef.current?.duration || 0) * 1000).toISOString().substr(14, 5)}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-6">
+                      <button onClick={() => videoRef.current.currentTime -= 5} className="text-slate-400 hover:text-white transition-colors"><SkipBack className="w-6 h-6" /></button>
+                      <button 
+                        onClick={() => isPlaying ? videoRef.current.pause() : videoRef.current.play()}
+                        className="w-14 h-14 bg-white text-black rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-transform shadow-[0_0_20px_rgba(255,255,255,0.2)]"
+                      >
+                        {isPlaying ? <Pause className="fill-current w-7 h-7" /> : <Play className="ml-1 fill-current w-7 h-7" />}
+                      </button>
+                      <button onClick={() => videoRef.current.currentTime += 5} className="text-slate-400 hover:text-white transition-colors"><SkipForward className="w-6 h-6" /></button>
+                      
+                      <div className="h-8 w-px bg-slate-800 mx-2" />
+                      
+                      <button 
+                        onClick={() => setLoopMode(!loopMode)}
+                        className={`flex flex-col items-center gap-1.5 transition-all duration-300 ${loopMode ? 'text-blue-500 scale-110' : 'text-slate-500 hover:text-white'}`}
+                      >
+                        <Repeat className={`w-6 h-6 ${loopMode ? 'animate-spin-slow' : ''}`} />
+                        <span className="text-[9px] font-black tracking-widest uppercase">Repeat</span>
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="flex bg-slate-800/80 backdrop-blur-md rounded-2xl p-1.5 border border-slate-700 shadow-inner">
+                        {[
+                          { id: 'ko', label: '한국어' },
+                          { id: 'en', label: 'English' },
+                          { id: 'cn', label: '中文' }
+                        ].map(l => (
+                          <button
+                            key={l.id}
+                            onClick={() => setCurrentLang(l.id)}
+                            className={`px-5 py-2 text-xs font-black rounded-xl transition-all ${currentLang === l.id ? 'bg-blue-600 text-white shadow-[0_5px_15px_rgba(37,99,235,0.4)]' : 'text-slate-500 hover:text-slate-200'}`}
+                          >
+                            {l.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Right Panel: Multilingual Script */}
+        <div className="w-[450px] lg:w-[600px] border-l bg-white dark:bg-slate-900 flex flex-col shrink-0 shadow-2xl z-20 dark:border-slate-800">
+          <div className="h-16 border-b flex items-center px-8 justify-between bg-slate-50 dark:bg-slate-800/50 dark:border-slate-800">
+            <div className="flex items-center gap-3 font-black text-sm tracking-tighter uppercase text-blue-600 dark:text-blue-500">
+              <List className="w-5 h-5" />
+              Learning Script
+            </div>
+          </div>
+          
+          <div 
+            className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar"
+            onMouseUp={handleMouseUp}
+          >
+            {selectedItem?.scripts.ko.map((line, idx) => {
+              const isActive = activeIdx === idx;
+              return (
+                <div 
+                  key={idx}
+                  onClick={() => videoRef.current.currentTime = line.start}
+                  className={`group relative grid grid-cols-1 gap-3 p-5 rounded-3xl transition-all cursor-pointer border ${isActive ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/30 dark:border-blue-800 ring-4 ring-blue-500/10 shadow-lg' : 'border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/80 hover:shadow-md'}`}
+                >
+                  <div 
+                    ref={el => subtitleRefs.ko.current[idx] = el}
+                    className={`text-base leading-snug font-bold ${isActive ? 'text-blue-800 dark:text-blue-400' : 'text-slate-800 dark:text-slate-200'}`}
+                  >
+                    <span className={`text-[10px] font-mono mr-3 px-2 py-0.5 rounded-md ${isActive ? 'bg-blue-500 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                      {new Date(line.start * 1000).toISOString().substr(14, 5)}
+                    </span>
+                    {line.text}
+                  </div>
+                  
+                  <div className="grid grid-cols-1 gap-2 pl-4 border-l-2 border-slate-100 dark:border-slate-800 group-hover:border-blue-500/30 transition-colors">
+                    <div 
+                      ref={el => subtitleRefs.cn.current[idx] = el}
+                      className={`text-sm leading-relaxed ${isActive ? 'text-slate-900 dark:text-slate-100 font-medium' : 'text-slate-500 dark:text-slate-400'}`}
+                    >
+                      {selectedItem.scripts.cn[idx]?.text || '-'}
+                    </div>
+                    <div 
+                      ref={el => subtitleRefs.en.current[idx] = el}
+                      className={`text-sm italic leading-relaxed ${isActive ? 'text-slate-900 dark:text-slate-100 font-medium' : 'text-slate-500 dark:text-slate-400'}`}
+                    >
+                      {selectedItem.scripts.en[idx]?.text || '-'}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </main>
+
+      {/* Dictionary Tooltip */}
+      {selectedText && (
+        <div 
+          className="fixed z-[60] bg-white dark:bg-slate-800 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] rounded-2xl p-3 flex gap-2 border border-slate-200 dark:border-slate-700 animate-in fade-in slide-in-from-bottom-2 duration-300"
+          style={{ left: Math.min(window.innerWidth - 220, Math.max(20, selectionPos.x - 100)), top: selectionPos.y }}
+        >
+          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-white dark:bg-slate-800 border-r border-b border-slate-200 dark:border-slate-700 rotate-45 shadow-sm" />
+          <a 
+            href={`https://dict.naver.com/search.nhn?query=${encodeURIComponent(selectedText)}`} 
+            target="_blank" 
+            className="px-4 py-2 bg-green-600 text-white text-xs font-black rounded-xl hover:bg-green-700 flex items-center gap-2 transition-all hover:scale-105 active:scale-95"
+          >
+            Naver <ExternalLink className="w-3 h-3" />
+          </a>
+          <a 
+            href={`https://translate.google.com/?sl=auto&tl=ko&text=${encodeURIComponent(selectedText)}`} 
+            target="_blank" 
+            className="px-4 py-2 bg-blue-600 text-white text-xs font-black rounded-xl hover:bg-blue-700 flex items-center gap-2 transition-all hover:scale-105 active:scale-95"
+          >
+            Google <ExternalLink className="w-3 h-3" />
+          </a>
+        </div>
+      )}
+
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; }
+        @keyframes spin-slow {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .animate-spin-slow { animation: spin-slow 8s linear infinite; }
+      `}</style>
+    </div>
+  );
+};
+
+export default App;

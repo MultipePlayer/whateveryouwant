@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JW Language Player</title>
+    <title>JW Language Learning Player</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- React & Babel (안정적인 버전 고정) -->
-    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <!-- React & Babel CDNs -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
@@ -30,7 +30,9 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo } = React;
 
-        // 아이콘 컴포넌트 (SVG 직접 삽입으로 라이브러리 에러 원천 차단)
+        /**
+         * 안정적인 SVG 아이콘 컴포넌트
+         */
         const Icon = ({ name, className = "w-5 h-5" }) => {
             const icons = {
                 play: <path d="m5 3 14 9-14 9V3z" />,
@@ -64,12 +66,30 @@
             const [currentLang, setCurrentLang] = useState('ko');
             const [currentTime, setCurrentTime] = useState(0);
             const [isPlaying, setIsPlaying] = useState(false);
-            const [loopMode, setLoopMode] = useState(false);
+            const [loopMode, setLoopMode] = useState(false); 
             const [selectedText, setSelectedText] = useState('');
             const [selectionPos, setSelectionPos] = useState({ x: 0, y: 0 });
 
             const videoRef = useRef(null);
-            const subtitleRefs = { ko: useRef([]), en: useRef([]), cn: useRef([]) };
+            const subtitleRefs = { 
+                ko: useRef([]), 
+                en: useRef([]), 
+                cn: useRef([]) 
+            };
+
+            // 특정 시간을 기준으로 해당 언어 스크립트에서 현재 문장의 인덱스를 찾는 함수
+            const findActiveIndex = (script, time) => {
+                if (!script || script.length === 0) return -1;
+                let index = -1;
+                for (let i = 0; i < script.length; i++) {
+                    if (time >= script[i].start) {
+                        index = i;
+                    } else {
+                        break;
+                    }
+                }
+                return index;
+            };
 
             const loadData = async () => {
                 setLoading(true);
@@ -80,14 +100,19 @@
                     const index = await response.json();
 
                     const allLoaded = await Promise.all(
-                        index.map(async (file) => {
-                            const res = await fetch(RAW_URL_CLEANER(`${USER_GITHUB_BASE}${file}`));
-                            return res.ok ? await res.json() : [];
+                        index.map(async (fileName) => {
+                            try {
+                                const fileUrl = RAW_URL_CLEANER(`${USER_GITHUB_BASE}${fileName}`);
+                                const res = await fetch(fileUrl);
+                                if (res.ok) return await res.json();
+                                return [];
+                            } catch (e) { return []; }
                         })
                     );
-                    setAllItems(allLoaded.flat().filter(i => i.natural_key));
+                    const flattened = allLoaded.flat().filter(item => item && item.natural_key);
+                    setAllItems(flattened);
                 } catch (err) {
-                    setError(err.message);
+                    setError(`데이터 동기화 실패: ${err.message}`);
                 } finally {
                     setLoading(false);
                 }
@@ -95,120 +120,203 @@
 
             useEffect(() => { loadData(); }, []);
 
-            const activeIdx = useMemo(() => {
-                const script = selectedItem?.scripts?.ko;
-                if (!script) return -1;
-                let idx = -1;
-                for (let i = 0; i < script.length; i++) {
-                    if (currentTime >= script[i].start) idx = i;
-                    else break;
-                }
-                return idx;
+            // 언어별 독립적으로 현재 재생 시간에 맞는 자막 인덱스를 계산 (타임스탬프 불일치 해결)
+            const activeIndices = useMemo(() => {
+                return {
+                    ko: findActiveIndex(selectedItem?.scripts?.ko, currentTime),
+                    en: findActiveIndex(selectedItem?.scripts?.en, currentTime),
+                    cn: findActiveIndex(selectedItem?.scripts?.cn, currentTime)
+                };
             }, [currentTime, selectedItem]);
 
             const onTimeUpdate = () => {
                 if (!videoRef.current) return;
-                setCurrentTime(videoRef.current.currentTime);
-                if (loopMode && selectedItem?.scripts?.ko && activeIdx !== -1) {
+                const v = videoRef.current;
+                setCurrentTime(v.currentTime);
+
+                // 루프 기능: 현재 활성화된 한국어 자막 구간을 반복 재생
+                if (loopMode && selectedItem?.scripts?.ko && activeIndices.ko !== -1) {
                     const script = selectedItem.scripts.ko;
-                    const endTime = script[activeIdx + 1]?.start || videoRef.current.duration;
-                    if (videoRef.current.currentTime >= endTime - 0.2) {
-                        videoRef.current.currentTime = script[activeIdx].start;
+                    const startTime = script[activeIndices.ko].start;
+                    const endTime = script[activeIndices.ko + 1]?.start || v.duration;
+                    if (v.currentTime >= endTime - 0.2) {
+                        v.currentTime = startTime;
                     }
                 }
             };
 
-            useEffect(() => {
-                if (activeIdx !== -1) {
-                    ['ko', 'en', 'cn'].forEach(l => {
-                        subtitleRefs[l].current[activeIdx]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    });
-                }
-            }, [activeIdx]);
+            const handleSearch = (e) => {
+                if (e) e.preventDefault();
+                const item = allItems.find(i => i.title.toLowerCase().includes(searchQuery.toLowerCase()));
+                if (item) { setSelectedItem(item); setSearchQuery(''); }
+            };
 
-            if (loading) return <div className="h-screen flex items-center justify-center bg-slate-900 text-white">동기화 중...</div>;
-            if (error) return <div className="h-screen flex flex-col items-center justify-center bg-slate-900 text-white p-4">
-                <Icon name="alert" className="w-12 h-12 text-red-500 mb-4" />
-                <p>{error}</p>
-                <button onClick={loadData} className="mt-4 px-4 py-2 bg-blue-600 rounded-lg">다시 시도</button>
-            </div>;
+            // 활성 자막이 바뀔 때마다 해당 위치로 자동 스크롤
+            useEffect(() => {
+                ['ko', 'en', 'cn'].forEach(langKey => {
+                    const idx = activeIndices[langKey];
+                    if (idx !== -1 && subtitleRefs[langKey].current[idx]) {
+                        subtitleRefs[langKey].current[idx].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                });
+            }, [activeIndices]);
+
+            if (loading) return (
+                <div className="flex items-center justify-center h-screen bg-slate-900 text-white font-sans">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-blue-500 mb-4 mx-auto"></div>
+                        <p className="text-slate-400 font-medium">GitHub 데이터 동기화 중...</p>
+                    </div>
+                </div>
+            );
+
+            if (error) return (
+                <div className="flex items-center justify-center h-screen bg-slate-900 text-white p-6 text-center">
+                    <div className="max-w-md bg-slate-800 p-8 rounded-3xl border border-slate-700 shadow-2xl">
+                        <Icon name="alert" className="w-16 h-16 text-red-500 mx-auto mb-6" />
+                        <h2 className="text-2xl font-bold mb-3">연결 오류</h2>
+                        <p className="text-slate-400 mb-8 text-sm leading-relaxed">{error}</p>
+                        <button onClick={loadData} className="w-full py-3 bg-blue-600 rounded-xl font-bold flex items-center justify-center gap-2">
+                            <Icon name="refresh" className="w-4 h-4" /> 다시 시도
+                        </button>
+                    </div>
+                </div>
+            );
 
             return (
-                <div className="flex flex-col h-screen overflow-hidden">
-                    <header className="h-16 border-b flex items-center justify-between px-6 bg-white dark:bg-slate-900 shrink-0">
+                <div className="flex flex-col h-screen text-slate-900 dark:text-slate-100 overflow-hidden font-sans">
+                    <header className="h-16 border-b bg-white dark:bg-slate-900 flex items-center justify-between px-6 shrink-0 z-20 shadow-sm border-slate-200 dark:border-slate-800">
                         <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">JW</div>
-                            <span className="font-bold hidden sm:inline">Language Player</span>
+                            <div className="w-9 h-9 bg-gradient-to-tr from-blue-700 to-blue-500 rounded-xl flex items-center justify-center text-white font-black shadow-lg">JW</div>
+                            <h1 className="font-bold text-lg hidden sm:block tracking-tight">Language Player</h1>
                         </div>
-                        <form onSubmit={(e) => { e.preventDefault(); const item = allItems.find(i => i.title.includes(searchQuery)); if (item) setSelectedItem(item); }} className="flex-1 max-w-xl mx-4 relative">
-                            <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                            <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="제목 검색..." className="w-full pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-full outline-none text-sm" />
+                        <form onSubmit={handleSearch} className="flex-1 max-w-2xl mx-6 relative">
+                            <Icon name="search" className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <input type="text" placeholder="영상 제목 검색..." className="w-full bg-slate-100 dark:bg-slate-800 rounded-full py-2.5 pl-11 pr-4 outline-none text-sm border border-transparent focus:border-blue-500" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                         </form>
-                        <div className="text-[10px] font-bold px-2 py-1 bg-green-100 text-green-700 rounded-md">LIVE</div>
+                        <div className="px-3 py-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-[10px] font-bold rounded-lg flex items-center gap-1.5 border border-blue-200 dark:border-blue-800">
+                            <Icon name="globe" className="w-3 h-3" /> GitHub Live
+                        </div>
                     </header>
 
                     <main className="flex-1 flex overflow-hidden">
-                        <div className="flex-1 flex flex-col bg-black relative min-w-0">
+                        <div className="flex-1 flex flex-col min-w-0 bg-black relative">
                             {!selectedItem ? (
-                                <div className="flex-1 flex flex-col items-center justify-center text-slate-500">
-                                    <Icon name="play" className="w-12 h-12 mb-4 opacity-20" />
-                                    <p>영상을 선택하세요</p>
-                                    <div className="mt-4 flex flex-wrap gap-2 justify-center p-4">
-                                        {allItems.slice(0, 10).map(i => <button key={i.natural_key} onClick={() => setSelectedItem(i)} className="px-3 py-1 bg-slate-800 text-white text-xs rounded-full">{i.title}</button>)}
+                                <div className="flex-1 flex items-center justify-center bg-slate-900 text-slate-500 p-8">
+                                    <div className="text-center max-w-sm">
+                                        <Icon name="play" className="w-12 h-12 mb-6 opacity-20 mx-auto text-blue-500" />
+                                        <h2 className="text-xl font-bold text-white mb-2">학습할 영상을 선택하세요</h2>
+                                        <p className="text-sm mb-8">저장소에 {allItems.length}개의 영상이 동기화되어 있습니다.</p>
+                                        <div className="flex flex-wrap gap-2 justify-center">
+                                            {allItems.slice(0, 12).map(item => (
+                                                <button key={item.natural_key} onClick={() => setSelectedItem(item)} className="px-4 py-2 bg-slate-800 hover:bg-blue-600 text-[11px] font-bold rounded-xl text-slate-200 transition-all border border-slate-700">
+                                                    {item.title}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
                             ) : (
                                 <>
                                     <div className="flex-1 relative flex items-center justify-center overflow-hidden">
                                         <video ref={videoRef} src={selectedItem.url} className="max-w-full max-h-full" onTimeUpdate={onTimeUpdate} onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} autoPlay />
-                                        <div className="absolute bottom-12 left-0 right-0 px-6 pointer-events-none">
-                                            <div className="bg-black/60 backdrop-blur-md text-white p-4 rounded-2xl text-center max-w-2xl mx-auto shadow-2xl">
-                                                <p className="text-2xl font-bold">{selectedItem.scripts[currentLang]?.[activeIdx]?.text}</p>
-                                                {currentLang !== 'ko' && <p className="text-lg text-slate-300">{selectedItem.scripts.ko[activeIdx]?.text}</p>}
+                                        
+                                        {/* 비디오 위 자막 오버레이 */}
+                                        <div className="absolute bottom-16 left-0 right-0 px-10 pointer-events-none select-none">
+                                            <div className="bg-black/60 backdrop-blur-xl text-white p-6 rounded-[2rem] text-center mx-auto max-w-4xl border border-white/10 shadow-2xl">
+                                                <p className="text-3xl font-bold mb-3 tracking-tight leading-snug">
+                                                    {selectedItem.scripts[currentLang]?.[activeIndices[currentLang]]?.text}
+                                                </p>
+                                                {currentLang !== 'ko' && (
+                                                    <p className="text-xl text-slate-300 font-semibold opacity-90">
+                                                        {selectedItem.scripts['ko']?.[activeIndices.ko]?.text}
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="p-4 bg-slate-900 flex items-center justify-between text-white shrink-0">
-                                        <div className="flex items-center gap-4">
-                                            <button onClick={() => isPlaying ? videoRef.current.pause() : videoRef.current.play()} className="w-10 h-10 bg-white text-black rounded-full flex items-center justify-center">
-                                                {isPlaying ? <Icon name="pause" /> : <Icon name="play" className="ml-1" />}
-                                            </button>
-                                            <button onClick={() => setLoopMode(!loopMode)} className={loopMode ? 'text-blue-500' : 'text-slate-500'}>
-                                                <Icon name="repeat" className={loopMode ? 'animate-spin-slow' : ''} />
-                                            </button>
-                                        </div>
-                                        <div className="flex gap-1 bg-slate-800 p-1 rounded-xl">
-                                            {['ko', 'en', 'cn'].map(l => <button key={l} onClick={() => setCurrentLang(l)} className={`px-4 py-1.5 text-xs font-bold rounded-lg ${currentLang === l ? 'bg-blue-600' : ''}`}>{l.toUpperCase()}</button>)}
+
+                                    {/* 플레이어 컨트롤러 */}
+                                    <div className="bg-slate-900 text-white p-4 pb-8 border-t border-slate-800 shadow-2xl shrink-0">
+                                        <div className="max-w-5xl mx-auto flex items-center justify-between">
+                                            <div className="flex items-center gap-6">
+                                                <button onClick={() => videoRef.current.currentTime -= 5} className="hover:text-blue-400"><Icon name="skipBack" className="w-6 h-6" /></button>
+                                                <button onClick={() => isPlaying ? videoRef.current.pause() : videoRef.current.play()} className="w-14 h-14 bg-white text-black rounded-full flex items-center justify-center hover:scale-105 transition-transform shadow-lg">
+                                                    {isPlaying ? <Icon name="pause" className="fill-current w-7 h-7" /> : <Icon name="play" className="ml-1 fill-current w-7 h-7" />}
+                                                </button>
+                                                <button onClick={() => videoRef.current.currentTime += 5} className="hover:text-blue-400"><Icon name="skipForward" className="w-6 h-6" /></button>
+                                                <button onClick={() => setLoopMode(!loopMode)} className={`flex flex-col items-center gap-1 transition-all ${loopMode ? 'text-blue-500 scale-110' : 'text-slate-500 hover:text-white'}`}>
+                                                    <Icon name="repeat" className={loopMode ? 'animate-spin-slow w-6 h-6' : 'w-6 h-6'} />
+                                                    <span className="text-[9px] font-black uppercase">Repeat</span>
+                                                </button>
+                                            </div>
+                                            <div className="flex bg-slate-800 rounded-2xl p-1.5 border border-slate-700 shadow-inner">
+                                                {[
+                                                    { id: 'ko', label: '한국어' },
+                                                    { id: 'en', label: 'English' },
+                                                    { id: 'cn', label: '中文' }
+                                                ].map(l => (
+                                                    <button key={l.id} onClick={() => setCurrentLang(l.id)} className={`px-5 py-2 text-xs font-black rounded-xl transition-all ${currentLang === l.id ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-200'}`}>
+                                                        {l.label}
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
                                     </div>
                                 </>
                             )}
                         </div>
 
-                        <div className="w-[400px] lg:w-[500px] border-l flex flex-col bg-white dark:bg-slate-900 shrink-0 shadow-xl">
-                            <div className="h-14 border-b flex items-center px-6 font-bold text-sm text-blue-600"><Icon name="list" className="mr-2" /> SCRIPT</div>
-                            <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar" onMouseUp={e => {
+                        {/* 우측 패널: 모든 언어 스크립트 대조 창 */}
+                        <div className="w-[450px] lg:w-[600px] border-l bg-white dark:bg-slate-900 flex flex-col shadow-2xl z-20 dark:border-slate-800 shrink-0">
+                            <div className="h-16 border-b flex items-center px-8 bg-slate-50 dark:bg-slate-800/50 dark:border-slate-800 font-black text-sm text-blue-600 tracking-tighter uppercase">
+                                <Icon name="list" className="w-5 h-5 mr-3" /> Learning Script
+                            </div>
+                            <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar" onMouseUp={(e) => {
                                 const s = window.getSelection().toString().trim();
-                                if (s) { setSelectedText(s); setSelectionPos({ x: e.clientX, y: e.clientY - 60 }); }
+                                if (s && s.length < 50) { setSelectedText(s); setSelectionPos({ x: e.clientX, y: e.clientY - 60 }); }
                                 else setSelectedText('');
                             }}>
-                                {selectedItem?.scripts.ko.map((line, idx) => (
-                                    <div key={idx} onClick={() => videoRef.current.currentTime = line.start} className={`p-4 rounded-2xl cursor-pointer border transition-all ${activeIdx === idx ? 'bg-blue-50 border-blue-200 ring-2 ring-blue-100' : 'border-slate-100 hover:bg-slate-50'}`}>
-                                        <div ref={el => subtitleRefs.ko.current[idx] = el} className={`text-sm font-bold ${activeIdx === idx ? 'text-blue-700' : ''}`}>{line.text}</div>
-                                        <div className="mt-2 text-xs text-slate-500 space-y-1 pl-4 border-l-2">
-                                            <div ref={el => subtitleRefs.cn.current[idx] = el}>{selectedItem.scripts.cn[idx]?.text}</div>
-                                            <div ref={el => subtitleRefs.en.current[idx] = el} className="italic">{selectedItem.scripts.en[idx]?.text}</div>
+                                {/* 기준이 되는 한국어 스크립트 렌더링 */}
+                                {selectedItem?.scripts.ko.map((line, koIdx) => {
+                                    const isKoActive = activeIndices.ko === koIdx;
+                                    
+                                    // 타임스탬프 불일치 해결: 한국어 문장 시간을 기준으로 영/중 문장 독립 검색
+                                    const enIdx = findActiveIndex(selectedItem.scripts.en, line.start);
+                                    const cnIdx = findActiveIndex(selectedItem.scripts.cn, line.start);
+
+                                    return (
+                                        <div key={koIdx} onClick={() => videoRef.current.currentTime = line.start} className={`p-5 rounded-3xl transition-all cursor-pointer border ${isKoActive ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/30 dark:border-blue-800 ring-4 ring-blue-500/10 shadow-lg' : 'border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/80 hover:shadow-md'}`}>
+                                            <div ref={el => subtitleRefs.ko.current[koIdx] = el} className={`text-base font-bold leading-snug ${isKoActive ? 'text-blue-800 dark:text-blue-400' : 'text-slate-800 dark:text-slate-200'}`}>
+                                                <span className={`text-[10px] font-mono mr-3 px-2 py-0.5 rounded-md ${isKoActive ? 'bg-blue-500 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                                                    {new Date(line.start * 1000).toISOString().substr(14, 5)}
+                                                </span>
+                                                {line.text}
+                                            </div>
+                                            
+                                            <div className="mt-3 pl-10 border-l-2 border-slate-100 dark:border-slate-800 space-y-2 text-[13px] text-slate-500 leading-relaxed">
+                                                {/* 중국어 문장 */}
+                                                <div ref={el => { if(cnIdx !== -1) subtitleRefs.cn.current[cnIdx] = el }} className={activeIndices.cn === cnIdx ? "text-slate-900 dark:text-slate-100 font-medium" : ""}>
+                                                    {selectedItem.scripts.cn[cnIdx]?.text || '-'}
+                                                </div>
+                                                {/* 영어 문장 */}
+                                                <div ref={el => { if(enIdx !== -1) subtitleRefs.en.current[enIdx] = el }} className={`italic ${activeIndices.en === enIdx ? "text-slate-900 dark:text-slate-100 font-medium" : ""}`}>
+                                                    {selectedItem.scripts.en[enIdx]?.text || '-'}
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
                     </main>
 
+                    {/* 사전 툴팁 */}
                     {selectedText && (
-                        <div className="fixed z-50 bg-white shadow-2xl rounded-xl p-2 flex gap-2 border" style={{ left: selectionPos.x, top: selectionPos.y }}>
-                            <a href={`https://dict.naver.com/search.nhn?query=${encodeURIComponent(selectedText)}`} target="_blank" className="px-3 py-1 bg-green-600 text-white text-[10px] font-bold rounded-lg">Naver</a>
-                            <a href={`https://translate.google.com/?sl=auto&tl=ko&text=${encodeURIComponent(selectedText)}`} target="_blank" className="px-3 py-1 bg-blue-600 text-white text-[10px] font-bold rounded-lg">Google</a>
+                        <div className="fixed z-[60] bg-white dark:bg-slate-800 shadow-2xl rounded-2xl p-3 flex gap-2 border border-slate-200 dark:border-slate-700 animate-in fade-in slide-in-from-bottom-2 duration-200" style={{ left: Math.min(window.innerWidth - 220, selectionPos.x), top: selectionPos.y }}>
+                            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-white dark:bg-slate-800 border-r border-b border-slate-200 dark:border-slate-700 rotate-45 shadow-sm" />
+                            <a href={`https://dict.naver.com/search.nhn?query=${encodeURIComponent(selectedText)}`} target="_blank" className="px-4 py-2 bg-green-600 text-white text-[11px] font-black rounded-xl hover:bg-green-700 transition-all hover:scale-105 active:scale-95">Naver</a>
+                            <a href={`https://translate.google.com/?sl=auto&tl=ko&text=${encodeURIComponent(selectedText)}`} target="_blank" className="px-4 py-2 bg-blue-600 text-white text-[11px] font-black rounded-xl hover:bg-blue-700 transition-all hover:scale-105 active:scale-95">Google</a>
                         </div>
                     )}
                 </div>

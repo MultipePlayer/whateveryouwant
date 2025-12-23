@@ -26,7 +26,8 @@ jobs:
       run: pip install requests urllib3
 
     - name: Run Collector Script
-      run: python collector.py
+      # [수정됨] 파일명을 collector.py에서 the_collector.py로 변경해야 합니다.
+      run: python the_collector.py
 
     - name: Commit and Push changes
       run: |
@@ -34,8 +35,10 @@ jobs:
         git config --global user.email 'actions@github.com'
         
         # 데이터 유실 방지를 위해 마스터 파일과 분할 파일을 모두 커밋
+        # 파이썬 코드의 LOCAL_SAVE_FILE 이름과 일치해야 합니다.
         git add jw_multilingual_data.json
         git add jw_multilingual_data_*.json
         git add jw_data_index.json
         
+        # 변경 사항이 있을 때만 커밋 및 푸시
         git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update data [$(date +'%Y-%m-%d')]" && git push)

@@ -1,42 +1,56 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" class="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>JW Language Learning Player</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#121212',
+                        panel: '#1e1e1e',
+                        accent: '#3b82f6'
+                    }
+                }
+            }
+        }
+    </script>
     <!-- React & Babel CDNs -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
     <style>
-        /* Google Fonts */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Noto+Sans+SC:wght@400;700&family=Noto+Serif+SC:wght@500;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@500;700&display=swap');
         
-        body { font-family: 'Inter', 'Noto Sans SC', sans-serif; margin: 0; padding: 0; }
+        html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; background-color: #121212; color: #e4e4e7; }
+        body { font-family: 'Inter', 'Noto Sans SC', sans-serif; -webkit-font-smoothing: antialiased; }
+        
         .font-chinese-serif { font-family: 'Noto Serif SC', serif; }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 10px; }
-        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #1e1e1e; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #6b7280; }
         
-        /* Range Slider */
-        input[type=range] { -webkit-appearance: none; background: transparent; }
-        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 14px; width: 14px; border-radius: 50%; background: #3b82f6; margin-top: -5px; box-shadow: 0 0 5px rgba(59, 130, 246, 0.5); cursor: pointer; }
-        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #e2e8f0; border-radius: 2px; }
-        .dark input[type=range]::-webkit-slider-runnable-track { background: #334155; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        
+        input[type=range] { -webkit-appearance: none; background: transparent; height: 4px; cursor: pointer; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 12px; width: 12px; border-radius: 50%; background: #3b82f6; margin-top: -4px; transition: transform 0.1s; }
+        input[type=range]:hover::-webkit-slider-thumb { transform: scale(1.2); }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: #3f3f46; border-radius: 2px; }
         
         @keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .animate-spin-slow { animation: spin-slow 8s linear infinite; }
-        
-        /* Toast Animation */
-        @keyframes slide-up { from { transform: translate(-50%, 100%); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
-        .toast-enter { animation: slide-up 0.3s ease-out forwards; }
+        .animate-spin-slow { animation: spin-slow 3s linear infinite; }
+        @keyframes slide-up { from { transform: translate(-50%, 20px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+        .toast-enter { animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
     </style>
 </head>
-<body class="bg-slate-50 dark:bg-slate-950">
-    <div id="root"></div>
+<body class="bg-darkbg text-zinc-200">
+    <div id="root" class="h-full flex flex-col"></div>
 
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo } = React;
@@ -46,19 +60,19 @@
                 play: <path d="m5 3 14 9-14 9V3z" />,
                 pause: <path d="M6 4h4v16H6zm8 0h4v16h-4z" />,
                 search: <React.Fragment><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></React.Fragment>,
-                globe: <React.Fragment><circle cx="12" cy="12" r="10" /><path d="M12 2a14.5 14.5 0 0 0 0 20" /><path d="M2 12h20" /></React.Fragment>,
-                alert: <React.Fragment><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></React.Fragment>,
-                refresh: <React.Fragment><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" /><path d="M16 16h5v5" /></React.Fragment>,
-                list: <React.Fragment><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></React.Fragment>,
-                repeat: <React.Fragment><path d="m17 2 4 4-4 4" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><path d="m7 22-4-4 4-4" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></React.Fragment>,
-                skipBack: <React.Fragment><polygon points="19 20 9 12 19 4 19 20" /><line x1="5" y1="19" x2="5" y2="5" /></React.Fragment>,
-                skipForward: <React.Fragment><polygon points="5 4 15 12 5 20 5 4" /><line x1="19" y1="5" x2="19" y2="19" /></React.Fragment>,
-                settings: <React.Fragment><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.39a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></React.Fragment>,
+                settings: <circle cx="12" cy="12" r="3" />,
                 x: <path d="M18 6 6 18M6 6l12 12"/>,
-                type: <React.Fragment><polyline points="4 7 4 4 20 4 20 7" /><line x1="9" y1="20" x2="15" y2="20" /><line x1="12" y1="4" x2="12" y2="20" /></React.Fragment>,
-                volume: <React.Fragment><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /></React.Fragment>,
-                message: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                volume: <path d="M11 5L6 9H2v6h4l5 4V5z" />,
+                message: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />,
+                list: <React.Fragment><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></React.Fragment>,
+                globe: <React.Fragment><circle cx="12" cy="12" r="10" /><path d="M12 2a14.5 14.5 0 0 0 0 20" /><path d="M2 12h20" /></React.Fragment>,
+                alert: <React.Fragment><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></React.Fragment>
             };
+            
+            if(name === 'skipBack') return <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 20 9 12l10-8v16Z"/><line x1="5" y1="19" x2="5" y2="5"/></svg>;
+            if(name === 'skipForward') return <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m5 4 10 8-10 8V4Z"/><line x1="19" y1="5" x2="19" y2="19"/></svg>;
+            if(name === 'repeat') return <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>;
+
             return (
                 <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     {icons[name] || null}
@@ -74,16 +88,19 @@
             const [allItems, setAllItems] = useState([]);
             const [loading, setLoading] = useState(true);
             const [error, setError] = useState(null);
-            
             const [searchQuery, setSearchQuery] = useState('');
             const [searchResults, setSearchResults] = useState([]);
             const [showSearchResults, setShowSearchResults] = useState(false);
-
             const [selectedItem, setSelectedItem] = useState(null);
-            const [audioLang, setAudioLang] = useState('ko');
-            const [subtitleLang, setSubtitleLang] = useState('ko');
+            
+            const [audioLang, setAudioLang] = useState('ko');     
+            const [baseLang, setBaseLang] = useState('ko');       
+            const [subtitleLang, setSubtitleLang] = useState('ko'); 
+            
             const [videoError, setVideoError] = useState(null);
             const [toastMessage, setToastMessage] = useState(null);
+            const [showPlayerSettings, setShowPlayerSettings] = useState(false);
+            const [showRightSettings, setShowRightSettings] = useState(false);
 
             const [currentTime, setCurrentTime] = useState(0);
             const [duration, setDuration] = useState(0);
@@ -92,17 +109,46 @@
             
             const [selectedText, setSelectedText] = useState('');
             const [selectionPos, setSelectionPos] = useState({ x: 0, y: 0 });
-            const [fontSizes, setFontSizes] = useState({ ko: 18, en: 16, cn: 20 });
+            const [fontSizes, setFontSizes] = useState({ ko: 16, en: 15, cn: 18 });
             const [showPinyin, setShowPinyin] = useState(true);
-            const [showSettings, setShowSettings] = useState(false);
-            const [showDebug, setShowDebug] = useState(false); 
             const [scriptSearchQuery, setScriptSearchQuery] = useState('');
+            const [showDebug, setShowDebug] = useState(false); 
 
             const videoRef = useRef(null);
             const subtitleRefs = { ko: useRef([]), en: useRef([]), cn: useRef([]) };
             const scriptContainerRef = useRef(null);
 
-            const findActiveIndex = (script, time) => {
+            const getMatchingContent = (targetScript, startTime, endTime) => {
+                if (!targetScript || targetScript.length === 0) return null;
+                const safeEndTime = endTime || (startTime + 5); 
+                
+                const matches = targetScript.filter(t => {
+                    const tStart = t.start;
+                    return tStart >= (startTime - 0.1) && tStart < (safeEndTime - 0.1);
+                });
+
+                if (matches.length === 0) {
+                    const nearest = targetScript.findIndex(t => t.start > startTime);
+                    if (nearest > 0) {
+                        const prev = targetScript[nearest - 1];
+                        if (prev.start <= startTime && (prev.end || prev.start + 5) > startTime) {
+                            return { ...prev, isFallback: true };
+                        }
+                    }
+                    return null;
+                }
+
+                const combinedText = matches.map(m => m.text).join(' ');
+                const combinedPinyin = matches.map(m => m.pinyin || '').join(' ');
+                
+                return { 
+                    text: combinedText, 
+                    pinyin: combinedPinyin.trim() ? combinedPinyin : null,
+                    start: matches[0].start 
+                };
+            };
+
+            const findIndexByTime = (script, time) => {
                 if (!script || script.length === 0) return -1;
                 let index = -1;
                 for (let i = 0; i < script.length; i++) {
@@ -121,7 +167,7 @@
                 setLoading(true); setError(null);
                 try {
                     const response = await fetch(INDEX_URL, { cache: 'no-cache' });
-                    if (!response.ok) throw new Error("인덱스 파일을 찾을 수 없습니다.");
+                    if (!response.ok) throw new Error("인덱스 로드 실패");
                     const index = await response.json();
                     const allLoaded = await Promise.all(
                         index.map(async (fileName) => {
@@ -132,23 +178,16 @@
                                     const items = await res.json();
                                     return items.map(item => ({
                                         ...item,
-                                        _searchIndex: JSON.stringify({
-                                            t: item.title,
-                                            u: item.url,
-                                            vu: item.video_urls,
-                                            v: item.videos,
-                                            s: item.scripts
-                                        }).toLowerCase()
+                                        _searchIndex: JSON.stringify({ t: item.title, u: item.url, s: item.scripts }).toLowerCase()
                                     }));
                                 }
                                 return [];
                             } catch (e) { return []; }
                         })
                     );
-                    const flattened = allLoaded.flat().filter(item => item && item.natural_key);
-                    setAllItems(flattened);
+                    setAllItems(allLoaded.flat().filter(item => item && item.natural_key));
                 } catch (err) {
-                    setError(`데이터 동기화 실패: ${err.message}`);
+                    setError(`데이터 로딩 실패: ${err.message}`);
                 } finally {
                     setLoading(false);
                 }
@@ -177,372 +216,486 @@
                 setIsPlaying(true);
                 setVideoError(null);
                 setAudioLang(initialLang);
-                setSubtitleLang(initialLang);
+                setBaseLang(initialLang);
+                setSubtitleLang(initialLang === 'ko' ? 'en' : 'ko');
+                setShowPlayerSettings(false);
             };
 
             const handleSearchSubmit = (e) => {
                 e.preventDefault();
-                if (searchResults.length > 0) {
-                    selectVideo(searchResults[0]);
-                    return;
-                }
-                if (searchQuery.includes('jw.org')) {
-                    const pubMatch = searchQuery.match(/(pub-[a-zA-Z0-9-_]+)/);
-                    const docidMatch = searchQuery.match(/docid=([0-9]+)/);
-                    const itemMatch = searchQuery.match(/item=([a-zA-Z0-9-_]+)/);
-                    const lankMatch = searchQuery.match(/lank=([a-zA-Z0-9-_]+)/);
-                    
-                    const localeMatch = searchQuery.match(/wtlocale=([a-zA-Z]+)/);
-                    let targetLang = 'ko';
-                    if (localeMatch) {
-                        const loc = localeMatch[1].toUpperCase();
-                        if (loc === 'CHS' || loc === 'CH' || loc === 'CN') targetLang = 'cn';
-                        else if (loc === 'E' || loc === 'EN') targetLang = 'en';
-                    }
+                if (searchResults.length > 0) { selectVideo(searchResults[0]); return; }
+                
+                let decodedQuery = searchQuery;
+                try { decodedQuery = decodeURIComponent(searchQuery); } catch (e) {}
 
-                    const keyword = pubMatch?.[1] || itemMatch?.[1] || lankMatch?.[1] || docidMatch?.[1];
-                    
+                if (decodedQuery.includes('jw.org')) {
+                    const pubMatch = decodedQuery.match(/(pub-[a-zA-Z0-9-_]+)/);
+                    const keyword = pubMatch?.[1];
+                    let targetLang = 'ko';
+                    if (decodedQuery.includes('/cmn-hans/') || decodedQuery.includes('wtlocale=CHS')) targetLang = 'cn';
+                    else if (decodedQuery.includes('/en/') || decodedQuery.includes('wtlocale=E')) targetLang = 'en';
+
                     if (keyword) {
-                        const smartFiltered = allItems.filter(item => item._searchIndex && item._searchIndex.includes(keyword.toLowerCase()));
-                        if (smartFiltered.length > 0) {
-                            selectVideo(smartFiltered[0], targetLang);
-                            if(targetLang !== 'ko') showToast(`링크 언어(${targetLang.toUpperCase()})로 설정됨`);
-                            return;
-                        }
+                        const hit = allItems.find(item => item._searchIndex.includes(keyword.toLowerCase()));
+                        if (hit) { selectVideo(hit, targetLang); showToast(`${targetLang.toUpperCase()} 모드로 설정`); return; }
                     }
-                    setVideoError("데이터베이스에 해당 영상이 없습니다. (파이썬 스크래퍼 업데이트 필요)");
-                    setSelectedItem({ title: "Unknown", isExternal: true, url: "", scripts: {ko:[]} });
+                    setVideoError("DB에 없는 영상입니다.");
+                    // SAFE GUARD: Initialize all script keys to prevent crash
+                    setSelectedItem({ title: "Unknown", isExternal: true, url: "", scripts: { ko: [], en: [], cn: [] } });
                     return;
                 }
                 if (searchQuery.startsWith('http')) {
-                    const isMedia = searchQuery.match(/\.(mp4|m3u8|mp3)$/i) || searchQuery.includes('akamaihd.net');
-                    if(isMedia) {
-                        const externalItem = {
-                            title: "External Video",
-                            url: searchQuery,
-                            scripts: { ko: [], en: [], cn: [] },
-                            natural_key: "external_" + Date.now(),
-                            isExternal: true
-                        };
-                        selectVideo(externalItem);
-                    } else {
-                         setVideoError("지원하지 않는 링크 형식입니다.");
-                         setSelectedItem({ title: "Unknown", isExternal: true, url: "", scripts: {ko:[]} });
-                    }
+                    selectVideo({
+                        title: "External Video",
+                        url: searchQuery,
+                        scripts: { ko: [], en: [], cn: [] },
+                        natural_key: "ext_" + Date.now(),
+                        isExternal: true
+                    });
                 }
             };
 
             const getVideoUrl = (item, lang) => {
                 if (!item) return '';
                 if (item.isExternal) return item.url;
-
-                const keyMap = {
-                    ko: ['ko', 'KR', 'kor', 'korean', 'Korean', 'kr', 'KO'],
-                    en: ['en', 'EN', 'eng', 'english', 'English', 'us', 'US', 'E'],
-                    cn: ['cn', 'CN', 'zh', 'chi', 'chinese', 'Chinese', 'chn', 'CHS', 'chs', 'zho', 'zh-hans', 'CH']
-                };
-
-                const checkKeys = keyMap[lang] || [lang];
-                
-                if (item.video_urls) {
-                    for (const k of checkKeys) {
-                        if (item.video_urls[k]) return item.video_urls[k];
-                    }
-                }
-                
-                if (item.videos) {
-                    for (const k of checkKeys) {
-                        if (item.videos[k]) return item.videos[k];
-                    }
-                }
-                
+                const map = { ko: ['ko','KR','KO'], en: ['en','E','EN'], cn: ['cn','CHS','CN'] };
+                const keys = map[lang] || [lang];
+                if (item.video_urls) { for (const k of keys) if (item.video_urls[k]) return item.video_urls[k]; }
+                if (item.videos) { for (const k of keys) if (item.videos[k]) return item.videos[k]; }
                 return item.url;
             };
 
             const currentVideoUrl = useMemo(() => getVideoUrl(selectedItem, audioLang), [selectedItem, audioLang]);
-            
+
             useEffect(() => {
                 if (!selectedItem || selectedItem.isExternal) return;
-                
                 if (audioLang !== 'ko') {
-                    const defaultUrl = selectedItem.url; 
-                    const targetUrl = getVideoUrl(selectedItem, audioLang);
-                    
-                    if (targetUrl === defaultUrl) {
-                        showToast(`'${audioLang.toUpperCase()}' 음성 데이터가 없습니다. 기본 언어로 재생합니다.`);
+                    const defUrl = selectedItem.url;
+                    const curUrl = getVideoUrl(selectedItem, audioLang);
+                    if (curUrl === defUrl && !selectedItem.video_urls?.[audioLang]) {
+                        showToast(`'${audioLang.toUpperCase()}' 음성 없음. 기본 언어 재생.`);
                     }
                 }
             }, [audioLang, selectedItem]);
 
+            // --- [CRITICAL FIX] Safe ActiveIndices ---
             const activeIndices = useMemo(() => {
-                return {
-                    ko: findActiveIndex(selectedItem?.scripts?.ko, currentTime),
-                    en: findActiveIndex(selectedItem?.scripts?.en, currentTime),
-                    cn: findActiveIndex(selectedItem?.scripts?.cn, currentTime)
-                };
-            }, [currentTime, selectedItem]);
-
-            const onTimeUpdate = () => {
-                if (!videoRef.current) return;
-                const v = videoRef.current;
-                setCurrentTime(v.currentTime);
-
-                if (loopMode && selectedItem?.scripts?.[subtitleLang]) {
-                    const script = selectedItem.scripts[subtitleLang];
-                    const idx = activeIndices[subtitleLang];
-                    if (idx !== -1) {
-                        const startTime = script[idx].start;
-                        const endTime = script[idx + 1]?.start || v.duration;
-                        if (v.currentTime >= endTime - 0.2) {
-                            v.currentTime = startTime;
-                        }
-                    }
+                // Ensure scripts object exists
+                if (!selectedItem || selectedItem.isExternal || !selectedItem.scripts) return { ko: -1, en: -1, cn: -1, base: -1 };
+                
+                const baseScript = selectedItem.scripts[baseLang];
+                
+                // Fallback: If base language script is missing, avoid crash by treating as independent
+                if (!baseScript || baseScript.length === 0) {
+                    return {
+                        ko: findIndexByTime(selectedItem.scripts.ko, currentTime),
+                        en: findIndexByTime(selectedItem.scripts.en, currentTime),
+                        cn: findIndexByTime(selectedItem.scripts.cn, currentTime),
+                        base: -1
+                    };
                 }
-            };
+
+                const baseIdx = findIndexByTime(baseScript, currentTime);
+                
+                // If index not found (e.g. before start time), handle gracefully
+                if (baseIdx === -1) {
+                     return {
+                        ko: findIndexByTime(selectedItem.scripts.ko, currentTime),
+                        en: findIndexByTime(selectedItem.scripts.en, currentTime),
+                        cn: findIndexByTime(selectedItem.scripts.cn, currentTime),
+                        base: -1
+                    };
+                }
+
+                // Safe access
+                const baseTime = baseScript[baseIdx].start;
+
+                return {
+                    ko: baseLang === 'ko' ? baseIdx : findIndexByTime(selectedItem.scripts.ko, baseTime),
+                    en: baseLang === 'en' ? baseIdx : findIndexByTime(selectedItem.scripts.en, baseTime),
+                    cn: baseLang === 'cn' ? baseIdx : findIndexByTime(selectedItem.scripts.cn, baseTime),
+                    base: baseIdx
+                };
+            }, [currentTime, selectedItem, baseLang]);
+
+            useEffect(() => {
+                const idx = activeIndices.base;
+                if (scriptSearchQuery === '' && idx !== -1 && subtitleRefs[baseLang]?.current?.[idx]) {
+                    subtitleRefs[baseLang].current[idx].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }, [activeIndices, scriptSearchQuery, baseLang]);
 
             const onLoadedData = () => {
-                if (videoRef.current && currentTime > 0) {
-                    videoRef.current.currentTime = currentTime;
-                    if (isPlaying) {
-                        const playPromise = videoRef.current.play();
-                        if (playPromise !== undefined) playPromise.catch(() => {});
-                    }
-                }
                 if (videoRef.current) {
+                    Array.from(videoRef.current.textTracks).forEach(t => t.mode = 'disabled');
+                    if (currentTime > 0) {
+                        videoRef.current.currentTime = currentTime;
+                        if (isPlaying) videoRef.current.play().catch(()=>{});
+                    }
                     setDuration(videoRef.current.duration);
                     setVideoError(null);
                 }
             };
 
-            const onVideoError = (e) => {
-                const err = e.currentTarget.error;
-                let msg = "비디오를 재생할 수 없습니다.";
-                if (err && err.code) msg += ` (Code: ${err.code})`;
-                
-                if (currentVideoUrl.includes('jw.org') && !currentVideoUrl.match(/\.(mp4|m3u8)/)) {
-                     msg = "데이터베이스에 해당 언어의 영상 파일 주소가 없습니다. 스크래퍼를 확인해주세요.";
-                }
-                setVideoError(msg);
-                setIsPlaying(false);
-            };
-
-            useEffect(() => {
-                ['ko', 'en', 'cn'].forEach(langKey => {
-                    const idx = activeIndices[langKey];
-                    if (scriptSearchQuery === '' && idx !== -1 && subtitleRefs[langKey].current[idx]) {
-                        subtitleRefs[langKey].current[idx].scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }
-                });
-            }, [activeIndices, scriptSearchQuery]);
-
-            const togglePlay = async () => {
+            const togglePlay = () => {
                 if (!videoRef.current) return;
-                try {
-                    if (videoRef.current.paused) await videoRef.current.play();
-                    else videoRef.current.pause();
-                } catch (err) { setIsPlaying(false); }
-            };
-
-            const handleSeek = (e) => {
-                const time = parseFloat(e.target.value);
-                if (videoRef.current) {
-                    videoRef.current.currentTime = time;
-                    setCurrentTime(time);
+                if (videoRef.current.paused) {
+                    const playPromise = videoRef.current.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch(error => {
+                            // Suppress AbortError
+                            if (error.name !== 'AbortError') {
+                                console.log("Playback interrupted", error);
+                            }
+                            setIsPlaying(false);
+                        });
+                    }
+                } else {
+                    videoRef.current.pause();
                 }
             };
 
-            const renderScriptList = () => {
-                if (!selectedItem || !selectedItem.scripts) return null;
-                if (selectedItem.isExternal) return <div className="p-10 text-center text-slate-400">외부 URL 직접 재생 중입니다.<br/>스크립트가 없습니다.</div>;
-
-                let scriptsToRender = selectedItem.scripts.ko.map((item, idx) => ({ ...item, originalIdx: idx }));
-                
-                if (scriptSearchQuery.trim() !== '') {
-                    const query = scriptSearchQuery.toLowerCase();
-                    scriptsToRender = scriptsToRender.filter(item => {
-                        const koText = item.text.toLowerCase();
-                        const enText = selectedItem.scripts.en[item.originalIdx]?.text?.toLowerCase() || '';
-                        const cnText = selectedItem.scripts.cn[item.originalIdx]?.text?.toLowerCase() || '';
-                        return koText.includes(query) || enText.includes(query) || cnText.includes(query);
-                    });
-                }
-
-                if (scriptsToRender.length === 0) return <div className="p-10 text-center text-slate-400">검색 결과가 없습니다.</div>;
-
-                return scriptsToRender.map((line) => {
-                    const koIdx = line.originalIdx;
-                    const isMainActive = activeIndices[subtitleLang] === findActiveIndex(selectedItem.scripts[subtitleLang], line.start);
-                    const enIdx = findActiveIndex(selectedItem.scripts.en, line.start);
-                    const cnIdx = findActiveIndex(selectedItem.scripts.cn, line.start);
-                    const cnData = selectedItem.scripts.cn[cnIdx];
-                    
-                    return (
-                        <div key={koIdx} onClick={() => videoRef.current.currentTime = line.start} className={`p-4 rounded-2xl transition-all cursor-pointer border mb-3 relative group ${isMainActive ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/30 dark:border-blue-800 ring-2 ring-blue-500/20 shadow-lg scale-[1.01]' : 'border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/80 hover:shadow-md'}`}>
-                            <div className="absolute top-4 right-4 text-[10px] font-mono opacity-50 group-hover:opacity-100">{new Date(line.start * 1000).toISOString().substr(14, 5)}</div>
-                            <div ref={el => subtitleRefs.ko.current[koIdx] = el} style={{ fontSize: `${fontSizes.ko}px` }} className={`font-bold leading-relaxed mb-2 transition-colors ${activeIndices.ko === koIdx ? 'text-blue-700 dark:text-blue-300' : 'text-slate-800 dark:text-slate-200'}`}>{line.text}</div>
-                            <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-700/50">
-                                {cnData && (
-                                    <div ref={el => { if(cnIdx !== -1) subtitleRefs.cn.current[cnIdx] = el }} className={`leading-relaxed ${activeIndices.cn === cnIdx ? "text-slate-900 dark:text-slate-100" : "text-slate-600 dark:text-slate-400"}`}>
-                                        {showPinyin && cnData.pinyin && <div style={{ fontSize: `${fontSizes.cn * 0.7}px` }} className="text-blue-500 dark:text-blue-400 font-light font-sans mb-0.5 select-text">{cnData.pinyin}</div>}
-                                        <div style={{ fontSize: `${fontSizes.cn}px` }} className="font-chinese-serif font-medium tracking-wide">{cnData.text}</div>
-                                    </div>
-                                )}
-                                {selectedItem.scripts.en[enIdx] && (
-                                    <div ref={el => { if(enIdx !== -1) subtitleRefs.en.current[enIdx] = el }} style={{ fontSize: `${fontSizes.en}px` }} className={`italic leading-snug font-sans ${activeIndices.en === enIdx ? "text-slate-900 dark:text-slate-100 font-medium" : "text-slate-500 dark:text-slate-500"}`}>{selectedItem.scripts.en[enIdx].text}</div>
-                                )}
-                            </div>
-                        </div>
-                    );
-                });
-            };
-
-            if (loading) return <div className="flex items-center justify-center h-screen bg-slate-900 text-white"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-blue-500"></div></div>;
-            if (error) return <div className="flex items-center justify-center h-screen bg-slate-900 text-white"><div className="text-center"><Icon name="alert" className="w-16 h-16 text-red-500 mx-auto mb-4" /><p>{error}</p><button onClick={loadData} className="mt-4 px-4 py-2 bg-blue-600 rounded">재시도</button></div></div>;
+            // --- Render ---
+            if (loading) return <div className="flex items-center justify-center h-full bg-darkbg text-zinc-500"><div className="animate-spin rounded-full h-8 w-8 border-2 border-zinc-600 border-t-zinc-200"></div></div>;
+            if (error) return <div className="flex items-center justify-center h-full text-red-400">{error}</div>;
 
             return (
-                <div className="flex flex-col h-screen text-slate-900 dark:text-slate-100 overflow-hidden font-sans select-none">
-                    <header className="h-14 border-b bg-white dark:bg-slate-900 flex items-center justify-between px-4 shrink-0 z-30 shadow-sm border-slate-200 dark:border-slate-800 relative">
+                <div className="flex flex-col h-full overflow-hidden select-none bg-darkbg">
+                    {/* Header */}
+                    <header className="h-14 flex items-center justify-between px-4 shrink-0 border-b border-zinc-800 bg-darkbg/90 backdrop-blur-md z-30">
                         <div className="flex items-center gap-2 cursor-pointer" onClick={() => { setSelectedItem(null); setIsPlaying(false); }}>
-                            <div className="w-8 h-8 bg-gradient-to-tr from-blue-700 to-blue-500 rounded-lg flex items-center justify-center text-white font-black shadow-lg">JW</div>
-                            <h1 className="font-bold text-base hidden sm:block tracking-tight">Language Player</h1>
+                            <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">J</div>
+                            <span className="font-bold text-sm tracking-tight hidden sm:block text-zinc-200">Language Player</span>
                         </div>
-                        <form onSubmit={handleSearchSubmit} className="flex-1 max-w-xl mx-4 relative group">
+                        
+                        <form onSubmit={handleSearchSubmit} className="flex-1 max-w-lg mx-4 relative group">
                             <div className="relative">
-                                <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
-                                <input type="text" placeholder="영상 제목, URL(JW.org/MP4) 검색..." className="w-full bg-slate-100 dark:bg-slate-800 rounded-full py-2 pl-10 pr-10 outline-none text-sm border border-transparent focus:border-blue-500 transition-all focus:bg-white dark:focus:bg-slate-900" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onFocus={() => { if(searchQuery) setShowSearchResults(true); }} />
-                                {searchQuery && <button type="button" onClick={() => { setSearchQuery(''); setSearchResults([]); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"><Icon name="x" className="w-3 h-3" /></button>}
+                                <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-blue-500 transition-colors" />
+                                <input 
+                                    type="text" 
+                                    placeholder="Search videos..." 
+                                    className="w-full bg-panel rounded-full py-2 pl-10 pr-10 outline-none text-sm transition-all focus:ring-1 focus:ring-blue-500 text-zinc-200 placeholder-zinc-600" 
+                                    value={searchQuery} 
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    onFocus={() => { if(searchQuery) setShowSearchResults(true); }}
+                                />
+                                {searchQuery && (
+                                    <button type="button" onClick={() => { setSearchQuery(''); setSearchResults([]); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300">
+                                        <Icon name="x" className="w-3.5 h-3.5" />
+                                    </button>
+                                )}
                             </div>
                             {showSearchResults && searchResults.length > 0 && (
-                                <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 max-h-[60vh] overflow-y-auto custom-scrollbar z-50 p-2">
+                                <div className="absolute top-full left-0 right-0 mt-2 bg-panel rounded-xl shadow-xl border border-zinc-700 max-h-[60vh] overflow-y-auto custom-scrollbar z-50 p-1.5">
                                     {searchResults.map(item => (
-                                        <button key={item.natural_key} type="button" onClick={() => selectVideo(item)} className="w-full text-left px-4 py-3 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-lg group transition-colors flex items-center justify-between">
-                                            <span className="font-medium text-sm group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate w-3/4">{item.title}</span>
-                                            <span className="text-[10px] text-slate-400 bg-slate-100 dark:bg-slate-900 px-2 py-1 rounded">Play</span>
+                                        <button key={item.natural_key} type="button" onClick={() => selectVideo(item)} className="w-full text-left px-3 py-2.5 hover:bg-zinc-700 rounded-lg group transition-colors flex items-center justify-between">
+                                            <span className="font-medium text-sm text-zinc-300 group-hover:text-blue-400 truncate w-3/4">{item.title}</span>
+                                            <span className="text-[10px] text-zinc-500 font-medium px-1.5 py-0.5 rounded bg-zinc-800">PLAY</span>
                                         </button>
                                     ))}
                                 </div>
                             )}
                         </form>
-                        <div className="hidden sm:flex px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-[10px] font-bold rounded-lg items-center gap-1.5 border border-blue-200 dark:border-blue-800"><Icon name="globe" className="w-3 h-3" /> v2.9.2</div>
                     </header>
 
-                    <main className="flex-1 flex overflow-hidden">
-                        <div className="flex-1 flex flex-col min-w-0 bg-black relative group">
+                    <main className="flex-1 flex overflow-hidden relative">
+                        {/* LEFT: Video Player (40%) */}
+                        <div className="w-[40%] flex flex-col min-w-0 bg-black relative group h-full border-r border-zinc-800">
                             {!selectedItem ? (
-                                <div className="flex-1 flex items-center justify-center bg-slate-900 text-slate-500 p-8 flex-col">
-                                    <Icon name="play" className="w-16 h-16 mb-4 opacity-20 text-blue-500" />
-                                    <p className="text-lg font-medium text-slate-400">영상 제목이나 URL을 입력하여 학습을 시작하세요.</p>
+                                <div className="flex-1 flex flex-col items-center justify-center bg-panel text-zinc-500 gap-4">
+                                    <Icon name="play" className="w-12 h-12 opacity-20" />
+                                    <p className="text-sm font-medium">비디오를 선택해주세요</p>
                                 </div>
                             ) : (
                                 <>
-                                    <div className="flex-1 relative flex items-center justify-center bg-black cursor-pointer" onClick={togglePlay}>
-                                        <video key={currentVideoUrl} ref={videoRef} src={currentVideoUrl} className="max-w-full max-h-full" onTimeUpdate={onTimeUpdate} onLoadedData={onLoadedData} onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onError={onVideoError} autoPlay />
-                                        {!isPlaying && !videoError && <div className="absolute inset-0 flex items-center justify-center bg-black/20 pointer-events-none"><div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center"><Icon name="play" className="w-8 h-8 fill-white text-white ml-1" /></div></div>}
+                                    <div className="flex-1 relative flex items-center justify-center bg-black cursor-pointer w-full min-h-0" onClick={togglePlay}>
+                                        <video 
+                                            key={currentVideoUrl} 
+                                            ref={videoRef} 
+                                            src={currentVideoUrl} 
+                                            className="w-full h-full object-contain" 
+                                            onTimeUpdate={() => {
+                                                if (videoRef.current) {
+                                                    setCurrentTime(videoRef.current.currentTime);
+                                                    if (loopMode && selectedItem?.scripts?.[baseLang]) {
+                                                        const script = selectedItem.scripts[baseLang];
+                                                        const idx = activeIndices.base;
+                                                        if (idx !== -1 && videoRef.current.currentTime >= (script[idx+1]?.start || videoRef.current.duration) - 0.2) {
+                                                            videoRef.current.currentTime = script[idx].start;
+                                                        }
+                                                    }
+                                                }
+                                            }}
+                                            onLoadedData={onLoadedData} 
+                                            onPlay={() => setIsPlaying(true)} 
+                                            onPause={() => setIsPlaying(false)} 
+                                            onError={(e) => {
+                                                console.error(e.currentTarget.error);
+                                                setVideoError("영상을 재생할 수 없습니다.");
+                                                setIsPlaying(false);
+                                            }}
+                                            playsInline autoPlay 
+                                        />
                                         
-                                        {/* Toast Message */}
-                                        {toastMessage && (
-                                            <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-slate-800/90 text-white px-6 py-3 rounded-full shadow-2xl z-50 text-sm font-bold backdrop-blur-md border border-slate-700 toast-enter flex items-center gap-2">
-                                                <Icon name="alert" className="w-4 h-4 text-yellow-500" />
-                                                {toastMessage}
-                                            </div>
-                                        )}
-
-                                        {videoError && (
-                                            <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10 p-6">
-                                                <div className="text-center max-w-md">
-                                                    <Icon name="alert" className="w-12 h-12 text-red-500 mx-auto mb-3" />
-                                                    <p className="text-white font-bold text-lg mb-2">재생 오류</p>
-                                                    <p className="text-slate-300 text-sm">{videoError}</p>
+                                        {!isPlaying && !videoError && (
+                                            <div className="absolute inset-0 flex items-center justify-center bg-black/40 pointer-events-none fade-in">
+                                                <div className="w-14 h-14 bg-white/10 backdrop-blur-sm rounded-full flex items-center justify-center text-white">
+                                                    <Icon name="play" className="w-6 h-6 ml-1 fill-current" />
                                                 </div>
                                             </div>
                                         )}
-                                        {!selectedItem.isExternal && !videoError && (
-                                            <div className="absolute bottom-4 left-0 right-0 px-4 text-center pointer-events-none">
-                                                <div className="inline-block bg-black/70 backdrop-blur-md px-8 py-4 rounded-2xl max-w-4xl shadow-2xl border border-white/5">
-                                                    <div className={`font-bold text-white leading-snug drop-shadow-md mb-2 ${subtitleLang === 'cn' ? 'font-chinese-serif tracking-wide text-3xl' : 'text-2xl'}`}>{selectedItem.scripts[subtitleLang]?.[activeIndices[subtitleLang]]?.text}</div>
-                                                    {subtitleLang === 'cn' && showPinyin && selectedItem.scripts.cn[activeIndices.cn]?.pinyin && <div className="text-blue-300 text-sm font-light mb-1">{selectedItem.scripts.cn[activeIndices.cn].pinyin}</div>}
-                                                    {subtitleLang !== 'ko' && <div className="text-lg text-slate-300 font-medium">{selectedItem.scripts['ko']?.[activeIndices.ko]?.text}</div>}
+
+                                        {/* Overlay Subtitles */}
+                                        {!selectedItem.isExternal && !videoError && selectedItem.scripts && (
+                                            <div className="absolute bottom-6 left-0 right-0 px-4 text-center pointer-events-none">
+                                                <div className="inline-block bg-black/70 backdrop-blur-md px-6 py-3 rounded-xl shadow-lg max-w-full">
+                                                    <div className={`text-white font-semibold leading-relaxed drop-shadow-sm transition-all duration-300 ${baseLang === 'cn' ? 'font-chinese-serif text-2xl tracking-wide' : 'text-xl'}`}>
+                                                        {selectedItem.scripts[baseLang]?.[activeIndices.base]?.text}
+                                                    </div>
+                                                    
+                                                    {/* Secondary Subtitle Logic */}
+                                                    {subtitleLang !== baseLang && (
+                                                        <div className={`text-zinc-300 text-base mt-1.5 font-medium ${subtitleLang === 'cn' ? 'font-chinese-serif' : ''}`}>
+                                                            {(() => {
+                                                                const baseItem = selectedItem.scripts[baseLang]?.[activeIndices.base];
+                                                                if (!baseItem) return null;
+                                                                const nextBaseItem = selectedItem.scripts[baseLang]?.[activeIndices.base + 1];
+                                                                const endTime = nextBaseItem ? nextBaseItem.start : null;
+                                                                
+                                                                const matched = getMatchingContent(selectedItem.scripts[subtitleLang], baseItem.start, endTime);
+                                                                return matched ? matched.text : '';
+                                                            })()}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {toastMessage && (
+                                            <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-zinc-800/90 text-white px-4 py-2 rounded-full shadow-lg z-50 text-xs font-semibold backdrop-blur-md toast-enter flex items-center gap-2 border border-zinc-700">
+                                                <Icon name="alert" className="w-3.5 h-3.5 text-yellow-400" /> {toastMessage}
+                                            </div>
+                                        )}
+                                        
+                                        {videoError && (
+                                            <div className="absolute inset-0 flex items-center justify-center bg-zinc-900 z-20">
+                                                <div className="text-center">
+                                                    <Icon name="alert" className="w-10 h-10 text-red-500 mx-auto mb-2 opacity-80" />
+                                                    <p className="text-zinc-400 text-sm">{videoError}</p>
                                                 </div>
                                             </div>
                                         )}
                                     </div>
-                                    <div className="bg-slate-900 border-t border-slate-800 p-4 shrink-0 z-20 space-y-3">
-                                        <div className="flex items-center gap-3 text-xs font-mono text-slate-400">
+
+                                    {/* CONTROLS */}
+                                    <div className="bg-panel border-t border-zinc-800 p-3 shrink-0 z-20">
+                                        <div className="flex items-center gap-3 text-[10px] font-mono font-medium text-zinc-400 mb-2">
                                             <span>{new Date(currentTime * 1000).toISOString().substr(14, 5)}</span>
-                                            <input type="range" min="0" max={duration || 100} value={currentTime} onChange={handleSeek} className="flex-1 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer" style={{ backgroundSize: `${(currentTime/duration)*100}% 100%` }} />
+                                            <input type="range" min="0" max={duration || 100} value={currentTime} onChange={(e) => { const t = parseFloat(e.target.value); if(videoRef.current) videoRef.current.currentTime = t; setCurrentTime(t); }} className="flex-1 h-1 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-blue-500" style={{ backgroundSize: `${(currentTime/duration)*100}% 100%` }} />
                                             <span>{new Date((duration || 0) * 1000).toISOString().substr(14, 5)}</span>
                                         </div>
-                                        <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
-                                            <div className="flex items-center gap-4 w-full lg:w-auto justify-center lg:justify-start">
-                                                <button onClick={() => videoRef.current.currentTime -= 5} className="text-slate-400 hover:text-white transition-colors"><Icon name="skipBack" /></button>
-                                                <button onClick={togglePlay} className="w-10 h-10 bg-white text-black rounded-full flex items-center justify-center hover:scale-105 transition-transform shadow-lg">{isPlaying ? <Icon name="pause" className="fill-current w-5 h-5" /> : <Icon name="play" className="ml-1 fill-current w-5 h-5" />}</button>
-                                                <button onClick={() => videoRef.current.currentTime += 5} className="text-slate-400 hover:text-white transition-colors"><Icon name="skipForward" /></button>
-                                                <div className="w-px h-6 bg-slate-700 mx-2"></div>
-                                                <button onClick={() => setLoopMode(!loopMode)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${loopMode ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}><Icon name="repeat" className={loopMode ? 'animate-spin-slow w-3 h-3' : 'w-3 h-3'} />{loopMode ? 'Loop' : 'Loop'}</button>
+
+                                        <div className="flex flex-wrap items-center justify-between gap-3">
+                                            <div className="flex items-center gap-3">
+                                                <button onClick={() => {if(videoRef.current) videoRef.current.currentTime -= 5}} className="p-2 rounded-full hover:bg-zinc-800 text-zinc-400 transition-colors"><Icon name="skipBack" /></button>
+                                                <button onClick={togglePlay} className="w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center shadow-lg transition-transform active:scale-95">
+                                                    {isPlaying ? <Icon name="pause" className="fill-current w-4 h-4" /> : <Icon name="play" className="ml-0.5 fill-current w-4 h-4" />}
+                                                </button>
+                                                <button onClick={() => {if(videoRef.current) videoRef.current.currentTime += 5}} className="p-2 rounded-full hover:bg-zinc-800 text-zinc-400 transition-colors"><Icon name="skipForward" /></button>
                                             </div>
+
                                             {!selectedItem.isExternal && (
-                                                <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
-                                                    <div className="flex items-center bg-black/50 rounded-lg p-1 border border-slate-700">
-                                                        <div className="px-2 text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1"><Icon name="volume" className="w-3 h-3" /> Audio</div>
-                                                        {[{ id: 'ko', label: 'KR' }, { id: 'en', label: 'EN' }, { id: 'cn', label: 'CN' }].map(l => (
-                                                            <button key={l.id} onClick={() => setAudioLang(l.id)} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ml-1 ${audioLang === l.id ? 'bg-green-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>{l.label}</button>
-                                                        ))}
-                                                    </div>
-                                                    <div className="flex items-center bg-black/50 rounded-lg p-1 border border-slate-700">
-                                                        <div className="px-2 text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1"><Icon name="message" className="w-3 h-3" /> Text</div>
-                                                        {[{ id: 'ko', label: 'KR' }, { id: 'en', label: 'EN' }, { id: 'cn', label: 'CN' }].map(l => (
-                                                            <button key={l.id} onClick={() => setSubtitleLang(l.id)} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ml-1 ${subtitleLang === l.id ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>{l.label}</button>
-                                                        ))}
-                                                    </div>
+                                                <div className="flex items-center gap-1 overflow-x-auto no-scrollbar ml-auto">
+                                                    <span className="text-[9px] font-bold text-zinc-600 mr-1 uppercase">Audio</span>
+                                                    {[{ id: 'ko', label: 'KR' }, { id: 'en', label: 'EN' }, { id: 'cn', label: 'CN' }].map(l => (
+                                                        <button 
+                                                            key={l.id} 
+                                                            onClick={() => setAudioLang(l.id)} 
+                                                            className={`px-2.5 py-1 text-[10px] font-bold rounded transition-all whitespace-nowrap ${audioLang === l.id ? 'bg-zinc-200 text-black' : 'text-zinc-500 hover:text-zinc-300 bg-zinc-800'}`}
+                                                        >
+                                                            {l.label}
+                                                        </button>
+                                                    ))}
                                                 </div>
                                             )}
+
+                                            <div className="relative">
+                                                <button 
+                                                    onClick={() => setShowPlayerSettings(!showPlayerSettings)} 
+                                                    className={`p-2 rounded-full transition-colors ${showPlayerSettings ? 'bg-zinc-800 text-blue-400' : 'text-zinc-400 hover:text-zinc-200'}`}
+                                                >
+                                                    <Icon name="settings" className="w-5 h-5" />
+                                                </button>
+                                                {showPlayerSettings && (
+                                                    <div className="absolute bottom-full right-0 mb-3 bg-panel border border-zinc-700 rounded-xl shadow-2xl p-3 w-40 popup-enter z-50">
+                                                        <button onClick={() => setLoopMode(!loopMode)} className="w-full flex items-center justify-between p-2 rounded hover:bg-zinc-800 transition-colors mb-2">
+                                                            <span className="text-xs font-bold text-zinc-300 flex items-center gap-2"><Icon name="repeat" className="w-3.5 h-3.5" /> Loop</span>
+                                                            <div className={`w-8 h-4 rounded-full relative transition-colors ${loopMode ? 'bg-blue-500' : 'bg-zinc-700'}`}>
+                                                                <div className={`w-2.5 h-2.5 bg-white rounded-full absolute top-0.5 transition-all ${loopMode ? 'left-5' : 'left-0.5'}`} />
+                                                            </div>
+                                                        </button>
+                                                        {!selectedItem.isExternal && (
+                                                            <div>
+                                                                <div className="text-[9px] font-bold text-zinc-500 uppercase px-1 mb-1">Subtitles</div>
+                                                                <div className="grid grid-cols-3 gap-1">
+                                                                    {[{ id: 'ko', label: 'KR' }, { id: 'en', label: 'EN' }, { id: 'cn', label: 'CN' }].map(l => (
+                                                                        <button 
+                                                                            key={l.id} 
+                                                                            onClick={() => setSubtitleLang(l.id)} 
+                                                                            className={`py-1 text-[10px] font-bold rounded transition-all ${subtitleLang === l.id ? 'bg-blue-900/50 text-blue-400' : 'text-zinc-500 hover:bg-zinc-800'}`}
+                                                                        >
+                                                                            {l.label}
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </>
                             )}
                         </div>
-                        <div className="w-[400px] lg:w-[500px] xl:w-[600px] border-l bg-white dark:bg-slate-900 flex flex-col shadow-2xl z-20 dark:border-slate-800 shrink-0">
-                            <div className="p-4 border-b dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2 text-sm font-black text-slate-700 dark:text-slate-300"><Icon name="list" className="w-4 h-4 text-blue-500" /> SCRIPTS</div>
-                                    {!selectedItem?.isExternal && <div className="flex items-center gap-2"><button onClick={() => setShowSettings(!showSettings)} className={`p-2 rounded-lg transition-colors ${showSettings ? 'bg-blue-100 text-blue-600 dark:bg-slate-800 dark:text-blue-400' : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}><Icon name="settings" className="w-4 h-4" /></button></div>}
-                                </div>
-                                {showSettings && !selectedItem?.isExternal && (
-                                    <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700 shadow-sm animate-in fade-in slide-in-from-top-2">
-                                        <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-100 dark:border-slate-700">
-                                            <span className="text-xs font-bold text-slate-500">Pinyin Display</span>
-                                            <button onClick={() => setShowPinyin(!showPinyin)} className={`text-[10px] font-bold px-3 py-1 rounded-full border transition-all ${showPinyin ? 'bg-blue-500 text-white border-blue-500' : 'bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-700 dark:border-slate-600'}`}>{showPinyin ? 'VISIBLE' : 'HIDDEN'}</button>
-                                        </div>
-                                        <div className="space-y-3">{['ko', 'en', 'cn'].map(lang => (<div key={lang} className="flex items-center gap-3"><span className="text-[10px] font-bold uppercase w-6 text-slate-400">{lang}</span><input type="range" min="12" max="30" step="1" value={fontSizes[lang]} onChange={(e) => setFontSizes({...fontSizes, [lang]: Number(e.target.value)})} className="flex-1 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer" /><span className="text-[10px] w-6 text-right text-slate-500">{fontSizes[lang]}px</span></div>))}</div>
-                                        
-                                        {/* Added Debug Button */}
-                                        <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700">
-                                            <button onClick={() => setShowDebug(!showDebug)} className="w-full text-center text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 py-1 border border-dashed border-slate-300 dark:border-slate-600 rounded">
-                                                {showDebug ? 'Hide Debug Info' : 'Show Debug Info'}
+
+                        {/* RIGHT: Script Panel (60%) */}
+                        <div className="w-[60%] border-l border-zinc-800 bg-darkbg flex flex-col shadow-xl z-20 shrink-0">
+                            {/* Script Header */}
+                            <div className="p-3 border-b border-zinc-800 bg-darkbg/95 backdrop-blur-sm space-y-2">
+                                {selectedItem && !selectedItem.isExternal ? (
+                                    <>
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] font-bold text-zinc-500 uppercase flex items-center gap-1"><Icon name="list" className="w-3 h-3" /> Base Lang</span>
+                                                <div className="flex bg-zinc-900 rounded-lg p-0.5">
+                                                    {[{ id: 'ko', label: 'KR' }, { id: 'en', label: 'EN' }, { id: 'cn', label: 'CN' }].map(l => (
+                                                        <button 
+                                                            key={l.id} 
+                                                            onClick={() => { setBaseLang(l.id); setSubtitleLang(l.id === 'ko' ? 'en' : 'ko'); }} 
+                                                            className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${baseLang === l.id ? 'bg-zinc-700 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                                        >
+                                                            {l.label}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <button onClick={() => setShowRightSettings(!showRightSettings)} className={`p-2 rounded-lg transition-colors ${showRightSettings ? 'bg-zinc-800 text-blue-400' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                                                <Icon name="settings" className="w-4 h-4" />
                                             </button>
-                                            {showDebug && (
-                                                <div className="mt-2 bg-slate-100 dark:bg-black p-2 rounded text-[10px] font-mono overflow-x-auto text-slate-600 dark:text-slate-400 max-h-40 overflow-y-auto">
-                                                    <div><strong>Available Video Keys:</strong> {selectedItem.video_urls ? Object.keys(selectedItem.video_urls).join(', ') : 'None'}</div>
-                                                    <div className="mt-1">{JSON.stringify(selectedItem.video_urls || selectedItem.videos || "No video_urls found", null, 2)}</div>
+                                        </div>
+
+                                        {showRightSettings && (
+                                            <div className="bg-panel rounded-xl p-3 border border-zinc-700 animate-in slide-in-from-top-2 fade-in mb-2">
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <span className="text-xs font-bold text-zinc-400">Pinyin</span>
+                                                    <button onClick={() => setShowPinyin(!showPinyin)} className={`text-[10px] font-bold px-2 py-1 rounded border transition-colors ${showPinyin ? 'bg-blue-600 border-blue-600 text-white' : 'border-zinc-600 text-zinc-400'}`}>{showPinyin ? 'ON' : 'OFF'}</button>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    {['ko', 'en', 'cn'].map(lang => (
+                                                        <div key={lang} className="flex items-center gap-2">
+                                                            <span className="text-[10px] font-bold uppercase w-5 text-zinc-500">{lang}</span>
+                                                            <input type="range" min="12" max="24" value={fontSizes[lang]} onChange={(e) => setFontSizes({...fontSizes, [lang]: Number(e.target.value)})} className="flex-1 h-1 bg-zinc-700 rounded-lg appearance-none cursor-pointer" />
+                                                            <span className="text-[10px] w-4 text-right text-zinc-500">{fontSizes[lang]}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <div className="mt-3 pt-2 border-t border-zinc-700">
+                                                    <button onClick={() => setShowDebug(!showDebug)} className="w-full text-[10px] text-zinc-500 hover:text-blue-400 py-1">{showDebug ? 'Hide' : 'Show'} Debug Info</button>
+                                                    {showDebug && <div className="mt-2 bg-black text-zinc-500 p-2 rounded text-[9px] font-mono break-all">{JSON.stringify(selectedItem.video_urls)}</div>}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="relative">
+                                            <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
+                                            <input 
+                                                type="text" 
+                                                placeholder="Filter scripts..." 
+                                                className="w-full bg-zinc-900 border border-transparent focus:border-blue-500 rounded-lg py-2 pl-9 pr-3 text-xs outline-none transition-all placeholder:text-zinc-600 text-zinc-300"
+                                                value={scriptSearchQuery}
+                                                onChange={(e) => setScriptSearchQuery(e.target.value)}
+                                            />
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="text-center py-4 text-zinc-600 font-medium text-sm">스크립트 없음</div>
+                                )}
+                            </div>
+
+                            {/* Script List with Smart Sync */}
+                            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-darkbg" ref={scriptContainerRef}>
+                                {selectedItem && !selectedItem.isExternal && selectedItem.scripts && selectedItem.scripts[baseLang]?.map((item, idx) => {
+                                    if (scriptSearchQuery && !item.text.toLowerCase().includes(scriptSearchQuery.toLowerCase())) return null;
+
+                                    const isActive = activeIndices.base === idx;
+                                    
+                                    // Use Smart Sync: Find MATCHING content, not just match by index
+                                    // Calculate end time for current item to define the match window
+                                    const nextItem = selectedItem.scripts[baseLang][idx + 1];
+                                    const endTime = nextItem ? nextItem.start : (item.start + 10);
+
+                                    // Get Matched Contents
+                                    const koContent = baseLang === 'ko' ? item : getMatchingContent(selectedItem.scripts.ko, item.start, endTime);
+                                    const enContent = baseLang === 'en' ? item : getMatchingContent(selectedItem.scripts.en, item.start, endTime);
+                                    const cnContent = baseLang === 'cn' ? item : getMatchingContent(selectedItem.scripts.cn, item.start, endTime);
+
+                                    return (
+                                        <div 
+                                            key={idx} 
+                                            onClick={() => videoRef.current.currentTime = item.start}
+                                            ref={isActive ? (el) => subtitleRefs[baseLang].current ? subtitleRefs[baseLang].current[idx] = el : null : null}
+                                            className={`mb-4 px-4 py-3 rounded-xl cursor-pointer transition-all duration-200 relative group border-l-4
+                                                ${isActive 
+                                                    ? 'bg-zinc-800/50 border-blue-500' 
+                                                    : 'hover:bg-zinc-900 border-transparent'
+                                                }`}
+                                        >
+                                            <div className="absolute top-3 right-3 text-[9px] font-mono text-zinc-600 group-hover:text-zinc-400 transition-colors">
+                                                {new Date(item.start * 1000).toISOString().substr(14, 5)}
+                                            </div>
+
+                                            {/* KO */}
+                                            {koContent && (
+                                                <div style={{ fontSize: `${fontSizes.ko}px` }} className={`leading-relaxed mb-1.5 transition-colors ${baseLang==='ko' && isActive ? 'font-bold text-blue-400' : 'text-zinc-300'}`}>
+                                                    {koContent.text}
+                                                </div>
+                                            )}
+
+                                            {/* CN */}
+                                            {cnContent && (
+                                                <div className={`leading-relaxed mb-1.5 ${baseLang==='cn' && isActive ? 'font-bold text-zinc-100' : 'text-zinc-400'}`}>
+                                                    {showPinyin && cnContent.pinyin && (
+                                                        <div style={{ fontSize: `${fontSizes.cn * 0.7}px` }} className="text-blue-400 mb-0.5">{cnContent.pinyin}</div>
+                                                    )}
+                                                    <div style={{ fontSize: `${fontSizes.cn}px` }} className="font-chinese-serif">{cnContent.text}</div>
+                                                </div>
+                                            )}
+
+                                            {/* EN */}
+                                            {enContent && (
+                                                <div style={{ fontSize: `${fontSizes.en}px` }} className={`italic leading-snug ${baseLang==='en' && isActive ? 'font-bold text-zinc-200' : 'text-zinc-500'}`}>
+                                                    {enContent.text}
                                                 </div>
                                             )}
                                         </div>
-                                    </div>
-                                )}
-                                {!selectedItem?.isExternal && <div className="relative"><Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" /><input type="text" placeholder="스크립트 내 검색..." className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg py-2 pl-9 pr-3 text-xs outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" value={scriptSearchQuery} onChange={(e) => setScriptSearchQuery(e.target.value)} />{scriptSearchQuery && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-blue-500 font-bold">Filtering</span>}</div>}
+                                    );
+                                })}
                             </div>
-                            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-slate-50/50 dark:bg-slate-900" ref={scriptContainerRef} onMouseUp={(e) => { const s = window.getSelection().toString().trim(); if (s && s.length < 50) { setSelectedText(s); setSelectionPos({ x: e.clientX, y: e.clientY - 60 }); } else setSelectedText(''); }}>{renderScriptList()}</div>
                         </div>
                     </main>
+
+                    {/* Dictionary Tooltip */}
                     {selectedText && (
-                        <div className="fixed z-[60] bg-white dark:bg-slate-800 shadow-2xl rounded-xl p-2 flex gap-2 border border-slate-200 dark:border-slate-700 animate-in fade-in zoom-in duration-200" style={{ left: Math.min(window.innerWidth - 220, selectionPos.x), top: selectionPos.y }}>
-                            <a href={`https://dict.naver.com/search.nhn?query=${encodeURIComponent(selectedText)}`} target="_blank" className="px-3 py-1.5 bg-[#03C75A] text-white text-[11px] font-bold rounded-lg hover:brightness-110 transition-all shadow-sm">Naver</a>
-                            <a href={`https://translate.google.com/?sl=auto&tl=ko&text=${encodeURIComponent(selectedText)}`} target="_blank" className="px-3 py-1.5 bg-[#4285F4] text-white text-[11px] font-bold rounded-lg hover:brightness-110 transition-all shadow-sm">Google</a>
+                        <div className="fixed z-50 bg-zinc-800 shadow-2xl rounded-xl p-1.5 flex gap-1 border border-zinc-700 animate-in zoom-in-95 duration-200" style={{ left: Math.min(window.innerWidth - 160, selectionPos.x), top: selectionPos.y - 50 }}>
+                            <a href={`https://dict.naver.com/search.nhn?query=${encodeURIComponent(selectedText)}`} target="_blank" className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-[10px] font-bold rounded-lg transition-colors">Naver</a>
+                            <a href={`https://translate.google.com/?sl=auto&tl=ko&text=${encodeURIComponent(selectedText)}`} target="_blank" className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold rounded-lg transition-colors">Google</a>
                         </div>
                     )}
                 </div>
             );
         };
+
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>

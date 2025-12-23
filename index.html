@@ -27,21 +27,21 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@500;700&display=swap');
         
-        html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; background-color: #121212; color: #e4e4e7; }
+        html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; background-color: #121212; color: #a1a1aa; }
         body { font-family: 'Inter', 'Noto Sans KR', sans-serif; -webkit-font-smoothing: antialiased; }
         
         .font-chinese-serif { font-family: 'Noto Serif SC', serif; }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #1e1e1e; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #52525b; }
         
         .no-scrollbar::-webkit-scrollbar { display: none; }
         
         input[type=range] { -webkit-appearance: none; background: transparent; height: 4px; cursor: pointer; }
         input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 12px; width: 12px; border-radius: 50%; background: #3b82f6; margin-top: -4px; transition: transform 0.1s; }
         input[type=range]:hover::-webkit-slider-thumb { transform: scale(1.2); }
-        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: #3f3f46; border-radius: 2px; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: #27272a; border-radius: 2px; }
         
         @keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .animate-spin-slow { animation: spin-slow 3s linear infinite; }
@@ -49,11 +49,90 @@
         .toast-enter { animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
     </style>
 </head>
-<body class="bg-darkbg text-zinc-200">
+<body class="bg-darkbg text-zinc-400">
     <div id="root" class="h-full flex flex-col"></div>
 
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+        // --- Helper Functions ---
+        
+        // Find index of item that started at or before time
+        const findIndexByTime = (script, time) => {
+            if (!script || script.length === 0) return -1;
+            let left = 0;
+            let right = script.length - 1;
+            let result = -1;
+            while (left <= right) {
+                const mid = Math.floor((left + right) / 2);
+                if (script[mid].start <= time) {
+                    result = mid;
+                    left = mid + 1;
+                } else {
+                    right = mid - 1;
+                }
+            }
+            return result;
+        };
+
+        // [UPGRADED] Overlap-based matching
+        const getMatchingContent = (targetScript, startTime, endTime) => {
+            if (!targetScript || targetScript.length === 0) return null;
+            
+            // If endTime is missing (last item), assume a reasonable duration (e.g., 5s)
+            const safeEndTime = endTime || (startTime + 10);
+            
+            // Strategy: Find ALL items that overlap with [startTime, safeEndTime]
+            // An item overlaps if: (item.start < safeEndTime) AND (itemEnd > startTime)
+            // Since we don't have explicit 'end' times, we assume itemEnd = nextItem.start
+            
+            // 1. Find the first item that could potentially overlap (starts before safeEndTime)
+            // We start searching from a bit before the startTime to catch items that started earlier but are still playing.
+            let startIndex = findIndexByTime(targetScript, startTime);
+            if (startIndex === -1) startIndex = 0;
+            
+            // Backtrack one step to be safe (in case the segment started slightly before startTime)
+            startIndex = Math.max(0, startIndex - 1);
+            
+            const matches = [];
+            
+            for (let i = startIndex; i < targetScript.length; i++) {
+                const item = targetScript[i];
+                
+                // If this item starts after our window ends, no need to check further
+                if (item.start >= safeEndTime) break;
+                
+                // Calculate implicit end time
+                const nextItem = targetScript[i+1];
+                // Default duration 5s if next item unknown
+                const itemEnd = nextItem ? nextItem.start : (item.start + 5); 
+                
+                // Check overlap
+                // Overlap exists if start < itemEnd AND end > item.start
+                if (startTime < itemEnd && safeEndTime > item.start) {
+                    // Calculate actual overlap duration to filter out tiny glitches
+                    const overlapStart = Math.max(startTime, item.start);
+                    const overlapEnd = Math.min(safeEndTime, itemEnd);
+                    const duration = overlapEnd - overlapStart;
+                    
+                    if (duration > 0.2) { // Only count if overlaps more than 0.2s
+                        matches.push(item);
+                    }
+                }
+            }
+
+            if (matches.length === 0) return null;
+
+            // Combine matched items
+            const combinedText = matches.map(m => m.text).join(' ');
+            const combinedPinyin = matches.map(m => m.pinyin || '').join(' ');
+            
+            return { 
+                text: combinedText, 
+                pinyin: combinedPinyin.trim() ? combinedPinyin : null,
+                start: matches[0].start 
+            };
+        };
 
         const Icon = React.memo(({ name, className = "w-5 h-5" }) => {
             if(name === 'skipBack') return <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 20 9 12l10-8v16Z"/><line x1="5" y1="19" x2="5" y2="5"/></svg>;
@@ -80,57 +159,6 @@
             );
         });
 
-        // --- Helper Functions ---
-        const findIndexByTime = (script, time) => {
-            if (!script || script.length === 0) return -1;
-            let left = 0;
-            let right = script.length - 1;
-            let result = -1;
-            while (left <= right) {
-                const mid = Math.floor((left + right) / 2);
-                if (script[mid].start <= time) {
-                    result = mid;
-                    left = mid + 1;
-                } else {
-                    right = mid - 1;
-                }
-            }
-            return result;
-        };
-
-        const getMatchingContent = (targetScript, startTime, endTime) => {
-            if (!targetScript || targetScript.length === 0) return null;
-            const safeEndTime = endTime || (startTime + 5); 
-            
-            const matches = targetScript.filter(t => {
-                const tStart = t.start;
-                return tStart >= (startTime - 0.1) && tStart < (safeEndTime - 0.1);
-            });
-
-            if (matches.length === 0) {
-                const nearestIdx = findIndexByTime(targetScript, startTime);
-                if (nearestIdx !== -1) {
-                    const prev = targetScript[nearestIdx];
-                    if (prev.start <= startTime && (prev.end || prev.start + 10) > startTime) {
-                         return { ...prev, isFallback: true };
-                    }
-                }
-                return null;
-            }
-
-            const combinedText = matches.map(m => m.text).join(' ');
-            const combinedPinyin = matches.map(m => m.pinyin || '').join(' ');
-            
-            return { 
-                text: combinedText, 
-                pinyin: combinedPinyin.trim() ? combinedPinyin : null,
-                start: matches[0].start 
-            };
-        };
-
-        // --- Components ---
-
-        // ScriptItem: Removed custom comparison for safer updates on toggle
         const ScriptItem = React.memo(({ 
             item, idx, isActive, onClick, baseLang, fontSizes, showPinyin, 
             koContent, cnContent, enContent 
@@ -147,28 +175,28 @@
                 <div 
                     onClick={() => onClick(item.start)}
                     ref={itemRef}
-                    className={`mb-4 px-4 py-3 rounded-xl cursor-pointer transition-all duration-200 relative group border-l-4
+                    className={`mb-3 px-4 py-3 rounded-lg cursor-pointer transition-all duration-200 relative group border-l-4
                         ${isActive 
-                            ? 'bg-zinc-800/50 border-blue-500' 
-                            : 'hover:bg-zinc-900 border-transparent'
+                            ? 'bg-zinc-800/80 border-blue-500' 
+                            : 'hover:bg-zinc-800/40 border-transparent'
                         }`}
                 >
-                    <div className="absolute top-3 right-3 text-[9px] font-mono text-zinc-600 group-hover:text-zinc-400 transition-colors">
+                    <div className="absolute top-3 right-3 text-[9px] font-mono text-zinc-600 group-hover:text-zinc-500 transition-colors">
                         {new Date(item.start * 1000).toISOString().substr(14, 5)}
                     </div>
 
                     {/* KO */}
                     {koContent && (
-                        <div style={{ fontSize: `${fontSizes.ko}px` }} className={`leading-relaxed mb-1.5 transition-colors ${baseLang==='ko' && isActive ? 'font-bold text-blue-400' : 'text-zinc-300'}`}>
+                        <div style={{ fontSize: `${fontSizes.ko}px` }} className={`leading-relaxed mb-1.5 transition-colors ${baseLang==='ko' && isActive ? 'font-bold text-blue-300' : 'text-zinc-400 group-hover:text-zinc-300'}`}>
                             {koContent.text}
                         </div>
                     )}
 
                     {/* CN */}
                     {cnContent && (
-                        <div className={`leading-relaxed mb-1.5 ${baseLang==='cn' && isActive ? 'font-bold text-zinc-100' : 'text-zinc-400'}`}>
+                        <div className={`leading-relaxed mb-1.5 ${baseLang==='cn' && isActive ? 'font-bold text-zinc-200' : 'text-zinc-500 group-hover:text-zinc-400'}`}>
                             {showPinyin && cnContent.pinyin && (
-                                <div style={{ fontSize: `${fontSizes.cn * 0.75}px` }} className="text-blue-400 mb-0.5 font-light">{cnContent.pinyin}</div>
+                                <div style={{ fontSize: `${fontSizes.cn * 0.75}px` }} className="text-blue-400/80 mb-0.5 font-light">{cnContent.pinyin}</div>
                             )}
                             <div style={{ fontSize: `${fontSizes.cn}px` }} className="font-chinese-serif">{cnContent.text}</div>
                         </div>
@@ -176,7 +204,7 @@
 
                     {/* EN */}
                     {enContent && (
-                        <div style={{ fontSize: `${fontSizes.en}px` }} className={`italic leading-snug ${baseLang==='en' && isActive ? 'font-bold text-zinc-200' : 'text-zinc-500'}`}>
+                        <div style={{ fontSize: `${fontSizes.en}px` }} className={`italic leading-snug ${baseLang==='en' && isActive ? 'font-bold text-zinc-200' : 'text-zinc-600 group-hover:text-zinc-500'}`}>
                             {enContent.text}
                         </div>
                     )}
@@ -188,10 +216,9 @@
             scripts, baseLang, activeIndex, onItemClick, searchQuery, 
             fontSizes, showPinyin 
         }) => {
-            
             const baseScript = scripts[baseLang];
             if (!baseScript || baseScript.length === 0) {
-                return <div className="p-10 text-center text-slate-400">선택한 기준 언어({baseLang === 'ko' ? '한국어' : baseLang === 'en' ? '영어' : '중국어'}) 스크립트가 없습니다.</div>;
+                return <div className="p-10 text-center text-zinc-600 text-sm">선택한 기준 언어의 스크립트가 없습니다.</div>;
             }
 
             let itemsToRender = baseScript;
@@ -200,17 +227,19 @@
                 itemsToRender = baseScript.filter(item => item.text.toLowerCase().includes(query));
             }
 
-            if (itemsToRender.length === 0) return <div className="p-10 text-center text-slate-400">검색 결과가 없습니다.</div>;
+            if (itemsToRender.length === 0) return <div className="p-10 text-center text-zinc-600 text-sm">검색 결과가 없습니다.</div>;
 
             return (
-                <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-darkbg">
+                <div className="flex-1 overflow-y-auto p-2 custom-scrollbar bg-darkbg">
                     {itemsToRender.map((item, idx) => {
                         const originalIdx = scripts[baseLang].indexOf(item); 
                         const isActive = activeIndex === originalIdx;
 
+                        // Calculate matching time window
                         const nextItem = scripts[baseLang][originalIdx + 1];
                         const endTime = nextItem ? nextItem.start : (item.start + 10);
 
+                        // Use Overlap Matcher
                         const koContent = baseLang === 'ko' ? item : getMatchingContent(scripts.ko, item.start, endTime);
                         const enContent = baseLang === 'en' ? item : getMatchingContent(scripts.en, item.start, endTime);
                         const cnContent = baseLang === 'cn' ? item : getMatchingContent(scripts.cn, item.start, endTime);
@@ -271,7 +300,6 @@
 
             const videoRef = useRef(null);
 
-            // Labels for UI
             const langLabels = { ko: '한국어', en: '영어', cn: '중국어' };
 
             const showToast = (msg) => {
@@ -283,7 +311,7 @@
                 setLoading(true); setError(null);
                 try {
                     const response = await fetch(INDEX_URL, { cache: 'no-cache' });
-                    if (!response.ok) throw new Error("인덱스 로드 실패");
+                    if (!response.ok) throw new Error("데이터를 불러올 수 없습니다.");
                     const index = await response.json();
                     const allLoaded = await Promise.all(
                         index.map(async (fileName) => {
@@ -353,7 +381,7 @@
 
                     if (keyword) {
                         const hit = allItems.find(item => item._searchIndex.includes(keyword.toLowerCase()));
-                        if (hit) { selectVideo(hit, targetLang); showToast(`${langLabels[targetLang]} 모드로 설정됨`); return; }
+                        if (hit) { selectVideo(hit, targetLang); showToast(`${langLabels[targetLang]} 모드로 설정`); return; }
                     }
                     setVideoError("DB에 없는 영상입니다.");
                     setSelectedItem({ title: "Unknown", isExternal: true, url: "", scripts: { ko: [], en: [], cn: [] } });
@@ -453,7 +481,6 @@
                 if (videoRef.current) videoRef.current.currentTime = time;
             }, []);
 
-            // --- Render ---
             if (loading) return <div className="flex items-center justify-center h-full bg-darkbg text-zinc-500"><div className="animate-spin rounded-full h-8 w-8 border-2 border-zinc-600 border-t-zinc-200"></div></div>;
             if (error) return <div className="flex items-center justify-center h-full text-red-400">{error}</div>;
 
@@ -532,7 +559,7 @@
                                             </div>
                                         )}
 
-                                        {/* Overlay Subtitles */}
+                                        {/* Overlay Subtitles (With Smart Sync) */}
                                         {!selectedItem.isExternal && !videoError && selectedItem.scripts && (
                                             <div className="absolute bottom-6 left-0 right-0 px-4 text-center pointer-events-none">
                                                 <div className="inline-block bg-black/70 backdrop-blur-md px-6 py-3 rounded-xl shadow-lg max-w-full">
@@ -540,15 +567,15 @@
                                                         {selectedItem.scripts[baseLang]?.[activeIndices.base]?.text}
                                                     </div>
                                                     
-                                                    {/* Secondary Subtitle */}
+                                                    {/* Smart Sync for Overlay */}
                                                     {subtitleLang !== baseLang && (
                                                         <div className={`text-zinc-300 text-base mt-1.5 font-medium ${subtitleLang === 'cn' ? 'font-chinese-serif' : ''}`}>
                                                             {(() => {
                                                                 const baseItem = selectedItem.scripts[baseLang]?.[activeIndices.base];
                                                                 if (!baseItem) return null;
+                                                                // Use Smart Sync logic
                                                                 const nextBaseItem = selectedItem.scripts[baseLang]?.[activeIndices.base + 1];
-                                                                const endTime = nextBaseItem ? nextBaseItem.start : null;
-                                                                
+                                                                const endTime = nextBaseItem ? nextBaseItem.start : (baseItem.start + 10);
                                                                 const matched = getMatchingContent(selectedItem.scripts[subtitleLang], baseItem.start, endTime);
                                                                 return matched ? matched.text : '';
                                                             })()}

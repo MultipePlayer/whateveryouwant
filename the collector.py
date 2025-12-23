@@ -5,7 +5,7 @@ import time
 import os
 import glob
 from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.retry import Retry
+from urllib3.util.retry import Retry
 
 # --- 설정 구역 ---
 MAIN_LANGUAGE = 'KO' 
@@ -37,7 +37,6 @@ retry = Retry(total=5, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 5
 http.mount("https://", HTTPAdapter(max_retries=retry))
 http.headers.update(HEADERS)
 
-# ... (time_to_seconds, parse_vtt, get_video_url_and_sub, fetch_variant_script 함수는 기존과 동일하므로 생략하지 않고 전체 코드 유지) ...
 def time_to_seconds(time_str):
     try:
         parts = time_str.split(':')
@@ -108,7 +107,7 @@ def crawl_category(category_key, collected_list, path_name=""):
     visited_keys.add(category_key)
     if any(ex in category_key for ex in EXCLUDE_KEYWORDS): return
 
-    target_url = f"{BASE_API_CATEGORY}{MAIN_LANGUAGE}/{category_key}?detailed=1"
+    target_url = f"{BASE_API_CATEGORY}/{MAIN_LANGUAGE}/{category_key}?detailed=1"
     try:
         res = http.get(target_url, timeout=20)
         if res.status_code != 200: return
@@ -149,66 +148,50 @@ def crawl_category(category_key, collected_list, path_name=""):
         time.sleep(0.05)
     except Exception as e: print(f"Error ({category_key}): {e}")
 
-# [중요] 데이터 불러오기 로직 개선
 def load_existing_data():
     total_data = []
-    
-    # 1. 마스터 파일(원본)이 있으면 그걸 우선 로드
     if os.path.exists(LOCAL_SAVE_FILE):
         try:
             with open(LOCAL_SAVE_FILE, 'r', encoding='utf-8') as f:
                 total_data = json.load(f)
-            print(f"Loaded from master file: {len(total_data)} items")
+            print(f"Loaded {len(total_data)} items from master file.")
         except: pass
-    
-    # 2. 마스터 파일이 없으면 분할 파일들을 찾아서 합침 (복구 모드)
     elif glob.glob("jw_multilingual_data_*.json"):
-        print("Master file not found. Reconstructing from split files...")
+        print("Reconstructing from split files...")
         split_files = sorted(glob.glob("jw_multilingual_data_*.json"), key=lambda x: int(re.findall(r'\d+', x)[0]))
         for file in split_files:
             try:
                 with open(file, 'r', encoding='utf-8') as f:
-                    chunk = json.load(f)
-                    total_data.extend(chunk)
+                    total_data.extend(json.load(f))
             except: pass
-        print(f"Reconstructed {len(total_data)} items from {len(split_files)} files.")
-
-    # URL 중복 체크용 셋업
+    
     for item in total_data:
         if 'url' in item: existing_urls.add(item['url'])
-        
     return total_data
 
 def save_data(data):
     data.sort(key=lambda x: x.get('date', '0000-00-00'), reverse=True)
     
-    # 마스터 파일 저장 (로컬 백업용)
+    # 마스터 파일 저장 (다음 실행 시 중복 체크용)
     with open(LOCAL_SAVE_FILE, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-    # 분할 파일 생성 (실사용 용도)
+    # 분할 파일 및 인덱스 생성
+    for f in glob.glob("jw_multilingual_data_*.json"): os.remove(f)
+
     file_list = []
-    
-    # 기존 분할 파일들 삭제 (깔끔하게 새로 씀)
-    for f in glob.glob("jw_multilingual_data_*.json"):
-        os.remove(f)
-
     total_chunks = (len(data) // CHUNK_SIZE) + 1
-    print(f"Saving {total_chunks} split files...")
-
     for i in range(total_chunks):
         chunk = data[i * CHUNK_SIZE : (i + 1) * CHUNK_SIZE]
         if not chunk: continue
         filename = f"jw_multilingual_data_{i+1}.json"
         with open(filename, 'w', encoding='utf-8') as f:
-            # 용량 최소화를 위해 indent 제거
             json.dump(chunk, f, ensure_ascii=False, separators=(',', ':'))
         file_list.append(filename)
     
-    # 인덱스 파일 생성
     with open('jw_data_index.json', 'w', encoding='utf-8') as f:
         json.dump(file_list, f, ensure_ascii=False)
-    print("All saved.")
+    print(f"Saved {len(data)} items into {len(file_list)} files.")
 
 def run():
     print("Start crawler...")
@@ -219,9 +202,6 @@ def run():
         crawl_category(category, collected_list)
 
     added_count = len(collected_list) - initial_count
-    print(f"\nDone! Added: {added_count}")
-    
-    # 데이터가 추가되었거나, 마스터 파일이 없어서 새로 만들어야 할 때 저장
     if added_count > 0 or not os.path.exists(LOCAL_SAVE_FILE):
         save_data(collected_list)
     else:

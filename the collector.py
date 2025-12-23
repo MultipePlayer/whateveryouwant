@@ -11,15 +11,15 @@ from urllib3.util.retry import Retry
 MAIN_LANGUAGE = 'KO' 
 ADDITIONAL_LANGS = {'en': 'E', 'cn': 'CHS'} 
 CHUNK_SIZE = 500  
-# 끝에 슬래시(/)를 제거하여 중첩 방지
 BASE_API_CATEGORY = "https://b.jw-cdn.org/apis/mediator/v1/categories"
 BASE_API_MEDIA = "https://b.jw-cdn.org/apis/mediator/v1/media-items"
 
+# VODNewestEvents를 맨 앞에 추가하여 최신 영상을 우선적으로 긁어옵니다.
 TARGET_CATEGORIES = [
-    'VODPgmEvtMorningWorship', 'VODStudio', 'VODChildren', 'VODTeenagers', 
-    'VODFamily', 'VODPgmEvt', 'VODOurActivities', 'VODMinistryTools', 
-    'VODOrganization', 'VODBible', 'VODMovies', 'VODSeries', 
-    'VODIntExp', 'VODNews', 'VideoOnDemand'
+    'VODNewestEvents', 'VODPgmEvtMorningWorship', 'VODStudio', 'VODChildren', 
+    'VODTeenagers', 'VODFamily', 'VODPgmEvt', 'VODOurActivities', 
+    'VODMinistryTools', 'VODOrganization', 'VODBible', 'VODMovies', 
+    'VODSeries', 'VODIntExp', 'VODNews', 'VideoOnDemand'
 ]
 
 EXCLUDE_KEYWORDS = ['Music', '음악', 'Audio Description', '화면 해설', 'AudioDescriptions']
@@ -107,51 +107,41 @@ def crawl_category(category_key, collected_list):
     visited_keys.add(category_key)
     if any(ex in category_key for ex in EXCLUDE_KEYWORDS): return
 
-    # URL 생성 시 슬래시(/) 중첩 문제 해결
     target_url = f"{BASE_API_CATEGORY}/{MAIN_LANGUAGE}/{category_key}?detailed=1"
-    
     try:
         res = http.get(target_url, timeout=20)
-        if res.status_code != 200:
-            print(f"  [!] Skipped: {category_key} (Status: {res.status_code})")
-            return
-        
+        if res.status_code != 200: return
         data = res.json()
         cat_info = data.get('category', {})
         current_title = cat_info.get('title', category_key)
         
-        # 미디어 아이템 수집
-        items = cat_info.get('media', [])
-        for media in items:
-            natural_key = media.get('languageAgnosticNaturalKey')
-            if not natural_key: continue
-            video_url, sub_url_ko = get_video_url_and_sub(media)
-            
-            if not video_url or video_url in existing_urls: continue
+        if 'media' in cat_info:
+            for media in cat_info['media']:
+                natural_key = media.get('languageAgnosticNaturalKey')
+                if not natural_key: continue
+                video_url, sub_url_ko = get_video_url_and_sub(media)
+                if not video_url or video_url in existing_urls: continue
 
-            print(f"   + New: {media['title'][:30]}...")
-            script_ko = parse_vtt(sub_url_ko)
-            script_en = fetch_variant_script(ADDITIONAL_LANGS['en'], natural_key)
-            script_cn = fetch_variant_script(ADDITIONAL_LANGS['cn'], natural_key)
+                print(f"   + New: {media['title'][:30]}...")
+                script_ko = parse_vtt(sub_url_ko)
+                script_en = fetch_variant_script(ADDITIONAL_LANGS['en'], natural_key)
+                script_cn = fetch_variant_script(ADDITIONAL_LANGS['cn'], natural_key)
 
-            if script_ko or script_en or script_cn:
-                collected_list.append({
-                    'category': current_title,
-                    'title': media['title'],
-                    'natural_key': natural_key,
-                    'url': video_url,
-                    'date': media.get('firstPublished', '0000-00-00'),
-                    'scripts': {'ko': script_ko, 'en': script_en, 'cn': script_cn}
-                })
-                existing_urls.add(video_url)
-                time.sleep(0.1)
+                if script_ko or script_en or script_cn:
+                    collected_list.append({
+                        'category': current_title,
+                        'title': media['title'],
+                        'natural_key': natural_key,
+                        'url': video_url,
+                        'date': media.get('firstPublished', '0000-00-00'),
+                        'scripts': {'ko': script_ko, 'en': script_en, 'cn': script_cn}
+                    })
+                    existing_urls.add(video_url)
+                    time.sleep(0.1)
             
-        # 서브 카테고리 재귀 탐색
         for sub in cat_info.get('subcategories', []):
             if sub.get('key'): crawl_category(sub.get('key'), collected_list)
-            
-    except Exception as e:
-        print(f"  [Error] {category_key}: {e}")
+    except Exception as e: print(f"Error ({category_key}): {e}")
 
 def load_existing_data():
     total_data = []
@@ -159,7 +149,7 @@ def load_existing_data():
         try:
             with open(LOCAL_SAVE_FILE, 'r', encoding='utf-8') as f:
                 total_data = json.load(f)
-            print(f"Loaded {len(total_data)} items from master file.")
+            print(f"Loaded {len(total_data)} items.")
         except: pass
     elif glob.glob("jw_multilingual_data_*.json"):
         split_files = sorted(glob.glob("jw_multilingual_data_*.json"), key=lambda x: int(re.findall(r'\d+', x)[0]))
@@ -168,20 +158,16 @@ def load_existing_data():
                 with open(file, 'r', encoding='utf-8') as f:
                     total_data.extend(json.load(f))
             except: pass
-        print(f"Reconstructed {len(total_data)} items from split files.")
-    
     for item in total_data:
         if 'url' in item: existing_urls.add(item['url'])
     return total_data
 
 def save_data(data):
+    # 날짜순 정렬
     data.sort(key=lambda x: x.get('date', '0000-00-00'), reverse=True)
-    
     with open(LOCAL_SAVE_FILE, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
-
     for f in glob.glob("jw_multilingual_data_*.json"): os.remove(f)
-
     file_list = []
     total_chunks = (len(data) // CHUNK_SIZE) + 1
     for i in range(total_chunks):
@@ -191,27 +177,21 @@ def save_data(data):
         with open(filename, 'w', encoding='utf-8') as f:
             json.dump(chunk, f, ensure_ascii=False, separators=(',', ':'))
         file_list.append(filename)
-    
     with open('jw_data_index.json', 'w', encoding='utf-8') as f:
         json.dump(file_list, f, ensure_ascii=False)
-    print(f"Successfully saved {len(data)} total items into {len(file_list)} files.")
+    print(f"Saved {len(data)} total items.")
 
 def run():
     print("--- Start JW Crawler ---")
     collected_list = load_existing_data()
     initial_count = len(collected_list)
-    
     for category in TARGET_CATEGORIES:
-        print(f"Scanning category: {category}...")
         crawl_category(category, collected_list)
-
     added_count = len(collected_list) - initial_count
-    print(f"\nCrawling Finished. Added {added_count} new items.")
-    
     if added_count > 0 or not os.path.exists(LOCAL_SAVE_FILE):
         save_data(collected_list)
     else:
-        print("No new data to save. Everything is up to date.")
+        print("No new data.")
 
 if __name__ == "__main__":
     run()

@@ -57,80 +57,84 @@
 
         // --- Helper Functions ---
         
-        // Find index of item that started at or before time
+        // Find index of item that is currently playing (time is between start and end)
+        // Modified to use end time if available, or just start time logic
         const findIndexByTime = (script, time) => {
             if (!script || script.length === 0) return -1;
+            
+            // Binary search optimized for finding the range
             let left = 0;
             let right = script.length - 1;
             let result = -1;
+
             while (left <= right) {
                 const mid = Math.floor((left + right) / 2);
-                if (script[mid].start <= time) {
-                    result = mid;
-                    left = mid + 1;
-                } else {
+                const item = script[mid];
+                
+                // If we have explicit end time (from updated parser), use it
+                // Fallback logic improved: if next item exists, use its start as end. If not, +10s.
+                const endTime = item.end || (script[mid+1] ? script[mid+1].start : item.start + 10);
+
+                if (time >= item.start && time < endTime) {
+                    return mid; // Exact match found
+                }
+                
+                if (time < item.start) {
                     right = mid - 1;
+                } else {
+                    // time >= endTime, so it's later
+                    left = mid + 1;
+                    // Keep track of the last item that started before time
+                    // This acts as a fallback if gaps exist
+                    result = mid; 
                 }
             }
             return result;
         };
 
-        // [UPGRADED] Overlap-based matching
+        // [UPGRADED] Overlap-based matching with Robust Logic
         const getMatchingContent = (targetScript, startTime, endTime) => {
             if (!targetScript || targetScript.length === 0) return null;
             
-            // If endTime is missing (last item), assume a reasonable duration (e.g., 5s)
-            const safeEndTime = endTime || (startTime + 10);
+            // Default duration window if endTime is missing
+            const safeEndTime = endTime || (startTime + 5);
             
-            // Strategy: Find ALL items that overlap with [startTime, safeEndTime]
-            // An item overlaps if: (item.start < safeEndTime) AND (itemEnd > startTime)
-            // Since we don't have explicit 'end' times, we assume itemEnd = nextItem.start
-            
-            // 1. Find the first item that could potentially overlap (starts before safeEndTime)
-            // We start searching from a bit before the startTime to catch items that started earlier but are still playing.
-            let startIndex = findIndexByTime(targetScript, startTime);
-            if (startIndex === -1) startIndex = 0;
-            
-            // Backtrack one step to be safe (in case the segment started slightly before startTime)
-            startIndex = Math.max(0, startIndex - 1);
-            
-            const matches = [];
-            
-            for (let i = startIndex; i < targetScript.length; i++) {
-                const item = targetScript[i];
+            // Filter items that overlap with the [startTime, safeEndTime] window
+            // An item overlaps if: (ItemStart < WindowEnd) AND (ItemEnd > WindowStart)
+            const matches = targetScript.filter(t => {
+                // If explicit end missing, assume 5s or next start (but we don't have next here easily without index)
+                // Let's assume a minimum duration if end is missing.
+                const tEnd = t.end || (t.start + 5); 
                 
-                // If this item starts after our window ends, no need to check further
-                if (item.start >= safeEndTime) break;
-                
-                // Calculate implicit end time
-                const nextItem = targetScript[i+1];
-                // Default duration 5s if next item unknown
-                const itemEnd = nextItem ? nextItem.start : (item.start + 5); 
-                
-                // Check overlap
-                // Overlap exists if start < itemEnd AND end > item.start
-                if (startTime < itemEnd && safeEndTime > item.start) {
-                    // Calculate actual overlap duration to filter out tiny glitches
-                    const overlapStart = Math.max(startTime, item.start);
-                    const overlapEnd = Math.min(safeEndTime, itemEnd);
-                    const duration = overlapEnd - overlapStart;
-                    
-                    if (duration > 0.2) { // Only count if overlaps more than 0.2s
-                        matches.push(item);
+                // Overlap condition:
+                // Allow a small tolerance (0.1s) to catch slightly misaligned subtitles
+                return (t.start < safeEndTime - 0.1) && (tEnd > startTime + 0.1);
+            });
+
+            if (matches.length === 0) {
+                // Fallback: Find the nearest subtitle that might have been missed due to gaps
+                // or just pick the one active at startTime
+                const idx = findIndexByTime(targetScript, startTime);
+                if (idx !== -1) {
+                    const candidate = targetScript[idx];
+                     // Check if it's reasonably close (e.g. within 2 seconds of start)
+                     // or if it covers the start time
+                    const cEnd = candidate.end || (candidate.start + 5);
+                    if (cEnd > startTime) {
+                         return { ...candidate, isFallback: true };
                     }
                 }
+                return null;
             }
 
-            if (matches.length === 0) return null;
-
-            // Combine matched items
+            // Combine text from all matched items
             const combinedText = matches.map(m => m.text).join(' ');
             const combinedPinyin = matches.map(m => m.pinyin || '').join(' ');
             
             return { 
                 text: combinedText, 
                 pinyin: combinedPinyin.trim() ? combinedPinyin : null,
-                start: matches[0].start 
+                start: matches[0].start // Use start of first match
             };
         };
 
@@ -235,9 +239,10 @@
                         const originalIdx = scripts[baseLang].indexOf(item); 
                         const isActive = activeIndex === originalIdx;
 
-                        // Calculate matching time window
+                        // Improved End Time Logic
                         const nextItem = scripts[baseLang][originalIdx + 1];
-                        const endTime = nextItem ? nextItem.start : (item.start + 10);
+                        // If current item has explict end, use it. Else infer from next start or add buffer.
+                        const endTime = item.end || (nextItem ? nextItem.start : (item.start + 10));
 
                         // Use Overlap Matcher
                         const koContent = baseLang === 'ko' ? item : getMatchingContent(scripts.ko, item.start, endTime);
@@ -299,6 +304,8 @@
             const [showDebug, setShowDebug] = useState(false); 
 
             const videoRef = useRef(null);
+            const subtitleRefs = { ko: useRef([]), en: useRef([]), cn: useRef([]) };
+            const scriptContainerRef = useRef(null); // Reference added here
 
             const langLabels = { ko: '한국어', en: '영어', cn: '중국어' };
 
@@ -442,8 +449,14 @@
                 if (loopMode && selectedItem?.scripts?.[baseLang]) {
                     const script = selectedItem.scripts[baseLang];
                     const idx = findIndexByTime(script, v.currentTime);
-                    if (idx !== -1 && v.currentTime >= (script[idx+1]?.start || v.duration) - 0.2) {
-                        v.currentTime = script[idx].start;
+                    if (idx !== -1) {
+                        const currentItem = script[idx];
+                        // Use end time if available, otherwise estimate
+                        const endTime = currentItem.end || (script[idx+1] ? script[idx+1].start : v.duration);
+                        
+                        if (v.currentTime >= endTime - 0.2) {
+                            v.currentTime = currentItem.start;
+                        }
                     }
                 }
             }, [selectedItem, baseLang, loopMode]);
@@ -573,9 +586,9 @@
                                                             {(() => {
                                                                 const baseItem = selectedItem.scripts[baseLang]?.[activeIndices.base];
                                                                 if (!baseItem) return null;
-                                                                // Use Smart Sync logic
-                                                                const nextBaseItem = selectedItem.scripts[baseLang]?.[activeIndices.base + 1];
-                                                                const endTime = nextBaseItem ? nextBaseItem.start : (baseItem.start + 10);
+                                                                
+                                                                const endTime = baseItem.end || (selectedItem.scripts[baseLang][activeIndices.base+1] ? selectedItem.scripts[baseLang][activeIndices.base+1].start : (baseItem.start + 10));
+                                                                
                                                                 const matched = getMatchingContent(selectedItem.scripts[subtitleLang], baseItem.start, endTime);
                                                                 return matched ? matched.text : '';
                                                             })()}
@@ -739,16 +752,33 @@
 
                             {/* Script List: Render Memoized List */}
                             {selectedItem && !selectedItem.isExternal && selectedItem.scripts && (
-                                <ScriptList 
-                                    scripts={selectedItem.scripts}
-                                    baseLang={baseLang}
-                                    activeIndex={activeIndices.base}
-                                    onItemClick={handleScriptClick}
-                                    searchQuery={scriptSearchQuery}
-                                    fontSizes={fontSizes}
-                                    showPinyin={showPinyin}
-                                    selectedItem={selectedItem}
-                                />
+                                <div 
+                                    className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-darkbg" 
+                                    ref={scriptContainerRef}
+                                    onMouseUp={() => {
+                                        const selection = window.getSelection();
+                                        const text = selection.toString().trim();
+                                        if (text && text.length > 0) {
+                                            const range = selection.getRangeAt(0);
+                                            const rect = range.getBoundingClientRect();
+                                            setSelectedText(text);
+                                            setSelectionPos({ x: rect.left + rect.width / 2, y: rect.top });
+                                        } else {
+                                            setSelectedText('');
+                                        }
+                                    }}
+                                >
+                                    <ScriptList 
+                                        scripts={selectedItem.scripts}
+                                        baseLang={baseLang}
+                                        activeIndex={activeIndices.base}
+                                        onItemClick={handleScriptClick}
+                                        searchQuery={scriptSearchQuery}
+                                        fontSizes={fontSizes}
+                                        showPinyin={showPinyin}
+                                        selectedItem={selectedItem}
+                                    />
+                                </div>
                             )}
                         </div>
                     </main>

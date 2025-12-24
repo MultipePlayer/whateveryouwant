@@ -163,8 +163,8 @@ def crawl_category(category_key, collected_list):
                 print(f"   + Processing: {media['title'][:30]}... (Update: {bool(existing_item)})")
                 
                 # 데이터 컨테이너 초기화 (기존 데이터가 있으면 유지)
-                scripts = existing_item['scripts'] if existing_item else {}
-                video_urls = existing_item['video_urls'] if existing_item else {}
+                scripts = existing_item.get('scripts', {}) if existing_item else {}
+                video_urls = existing_item.get('video_urls', {}) if existing_item else {}
                 titles = existing_item.get('titles', {}) if existing_item else {}
 
                 # 1. 한국어 데이터 업데이트
@@ -296,3 +296,4 @@ def run():
 
 if __name__ == "__main__":
     run()
+

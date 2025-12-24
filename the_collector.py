@@ -28,7 +28,8 @@ EXCLUDE_KEYWORDS = ['Music', '음악', 'Audio Description', '화면 해설', 'Au
 LOCAL_SAVE_FILE = "jw_multilingual_data.json"
 
 visited_keys = set()
-existing_keys = set() # [수정] URL 대신 고유 ID(natural_key)로 중복 체크
+# [수정] 단순 키 집합 대신, 데이터 객체 자체를 매핑하여 업데이트 가능하게 변경
+existing_map = {} 
 
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -96,7 +97,7 @@ def get_video_url_and_sub(media_item):
 
 def fetch_variant_data(lang_code, natural_key):
     """
-    특정 언어(lang_code)의 미디어 정보를 가져와 비디오 URL과 자막 데이터를 반환합니다.
+    특정 언어(lang_code)의 미디어 정보를 가져와 비디오 URL, 자막, [추가] 제목을 반환합니다.
     """
     target_url = f"{BASE_API_MEDIA}/{lang_code}/{natural_key}?clientType=www"
     try:
@@ -104,11 +105,13 @@ def fetch_variant_data(lang_code, natural_key):
         if res.status_code == 200:
             data = res.json()
             media = data.get('media', [{}])[0]
+            # [추가] 해당 언어의 제목 추출
+            title = media.get('title', '')
             video_url, sub_url = get_video_url_and_sub(media)
             script = parse_vtt(sub_url) if sub_url else []
-            return video_url, script
+            return video_url, script, title
     except: pass
-    return None, []
+    return None, [], ""
 
 def crawl_category(category_key, collected_list):
     if category_key in visited_keys: return
@@ -128,47 +131,92 @@ def crawl_category(category_key, collected_list):
                 natural_key = media.get('languageAgnosticNaturalKey')
                 if not natural_key: continue
                 
-                # [핵심 수정] 기존에 있는 ID라면 즉시 건너뜀 (속도 향상)
-                if natural_key in existing_keys:
-                    # 디버깅용 로그가 필요하면 주석 해제
-                    # print(f"Skipping existing: {media['title'][:30]}")
+                # [개선된 로직]
+                # 1. 이미 존재하는 항목인지 확인
+                existing_item = existing_map.get(natural_key)
+                
+                needs_update = False
+                
+                if not existing_item:
+                    # 아예 없는 항목이면 수집 대상
+                    needs_update = True
+                else:
+                    # 이미 있지만, 다른 언어(영어/중국어) 데이터가 비어있다면 업데이트 대상
+                    current_urls = existing_item.get('video_urls', {})
+                    # 우리가 원하는 언어들이 모두 video_urls에 있는지 확인 (ko는 있다고 가정)
+                    # 하나라도 없으면 재수집 시도
+                    if 'en' not in current_urls or 'cn' not in current_urls:
+                         needs_update = True
+                    # 또는 titles가 없다면 업데이트 (검색 기능 지원 위해)
+                    if 'titles' not in existing_item:
+                         needs_update = True
+
+                if not needs_update:
                     continue
 
-                # 한국어 기본 데이터
-                video_url_ko, sub_url_ko = get_video_url_and_sub(media)
-                if not video_url_ko: continue
-
-                print(f"   + New Found: {media['title'][:30]}...")
+                # --- 수집 시작 ---
                 
-                # 스크립트 및 비디오 URL 수집 컨테이너
-                scripts = {}
-                video_urls = {}
+                # 한국어 기본 데이터 (없으면 기존 것 사용 시도, 없으면 수집 불가)
+                video_url_ko, sub_url_ko = get_video_url_and_sub(media)
+                if not video_url_ko and not existing_item: continue
 
-                # 1. 한국어 데이터 처리
-                scripts['ko'] = parse_vtt(sub_url_ko)
-                video_urls['ko'] = video_url_ko
+                print(f"   + Processing: {media['title'][:30]}... (Update: {bool(existing_item)})")
+                
+                # 데이터 컨테이너 초기화 (기존 데이터가 있으면 유지)
+                scripts = existing_item['scripts'] if existing_item else {}
+                video_urls = existing_item['video_urls'] if existing_item else {}
+                titles = existing_item.get('titles', {}) if existing_item else {}
+
+                # 1. 한국어 데이터 업데이트
+                if sub_url_ko: 
+                    # 이미 있으면 굳이 다시 파싱 안해도 되지만, 정확성을 위해 갱신 가능
+                    # 여기서는 없거나 비어있을 때만 채움
+                    if 'ko' not in scripts or not scripts['ko']:
+                        scripts['ko'] = parse_vtt(sub_url_ko)
+                
+                if video_url_ko:
+                    video_urls['ko'] = video_url_ko
+                
+                titles['ko'] = media['title']
 
                 # 2. 다른 언어(영어, 중국어) 데이터 처리
-                # LANG_MAP에서 'ko'는 이미 처리했으므로 제외하고 순회
                 for key, code in LANG_MAP.items():
                     if key == 'ko': continue
-                    v_url, script = fetch_variant_data(code, natural_key)
+                    
+                    # 이미 데이터가 빵빵하면 건너뛰기 (API 요청 절약)
+                    if key in video_urls and key in scripts and key in titles:
+                        continue
+
+                    v_url, script, var_title = fetch_variant_data(code, natural_key)
+                    
                     if v_url: video_urls[key] = v_url
                     if script: scripts[key] = script
+                    if var_title: titles[key] = var_title
 
-                # 유효한 데이터가 하나라도 있으면 추가
-                if any(scripts.values()):
-                    collected_list.append({
+                # 저장 로직
+                if existing_item:
+                    # 기존 객체 업데이트 (Reference Update)
+                    existing_item['video_urls'] = video_urls
+                    existing_item['scripts'] = scripts
+                    existing_item['titles'] = titles
+                    # 날짜나 제목 등도 최신화
+                    existing_item['date'] = media.get('firstPublished', existing_item.get('date'))
+                else:
+                    # 신규 추가
+                    new_item = {
                         'category': current_title,
                         'title': media['title'],
                         'natural_key': natural_key,
-                        'url': video_url_ko, # 기본 URL (하위 호환성)
+                        'url': video_url_ko,
                         'video_urls': video_urls, 
+                        'titles': titles, # [추가] 다국어 제목 저장
                         'date': media.get('firstPublished', '0000-00-00'),
                         'scripts': scripts
-                    })
-                    existing_keys.add(natural_key) # 현재 실행 중 중복 방지
-                    time.sleep(0.1)
+                    }
+                    collected_list.append(new_item)
+                    existing_map[natural_key] = new_item
+                
+                time.sleep(0.1) # 매너 딜레이
             
         for sub in cat_info.get('subcategories', []):
             if sub.get('key'): crawl_category(sub.get('key'), collected_list)
@@ -184,7 +232,7 @@ def load_existing_data():
             print(f"Loaded {len(total_data)} items from master file.")
         except: pass
     
-    # 분할 파일 확인 (마스터 파일이 없거나 비어있을 경우 보완)
+    # 분할 파일 확인
     if not total_data and glob.glob("jw_multilingual_data_*.json"):
         split_files = sorted(glob.glob("jw_multilingual_data_*.json"), key=lambda x: int(re.findall(r'\d+', x)[0]))
         for file in split_files:
@@ -195,15 +243,10 @@ def load_existing_data():
             except: pass
         print(f"Loaded {len(total_data)} items from split files.")
 
-    # [핵심 수정] 기존 데이터의 ID(natural_key)를 Set에 등록
+    # [수정] Map 구성 (natural_key -> Item Object)
     for item in total_data:
         if 'natural_key' in item:
-            existing_keys.add(item['natural_key'])
-        # 호환성: 옛날 데이터에 natural_key가 없다면 url로라도 체크
-        elif 'url' in item:
-            # URL로 체크하는 방식은 덜 정확하지만 비상용으로 유지할 수 있음
-            # 여기서는 natural_key 위주로 가되, 필요하면 로직 추가 가능
-            pass 
+            existing_map[item['natural_key']] = item
             
     return total_data
 
@@ -211,11 +254,11 @@ def save_data(data):
     # 날짜순 정렬
     data.sort(key=lambda x: x.get('date', '0000-00-00'), reverse=True)
     
-    # 통합 파일 저장 (백업용)
+    # 통합 파일 저장
     with open(LOCAL_SAVE_FILE, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     
-    # 기존 분할 파일 삭제 (깨끗하게 다시 쓰기 위해)
+    # 기존 분할 파일 삭제
     for f in glob.glob("jw_multilingual_data_*.json"): 
         try: os.remove(f)
         except: pass
@@ -238,24 +281,18 @@ def save_data(data):
     print(f"Saved {len(data)} total items.")
 
 def run():
-    print("--- Start JW Crawler (Incremental Update) ---")
+    print("--- Start JW Crawler (Smart Update Mode) ---")
     
     # 1. 기존 데이터 로드
     collected_list = load_existing_data()
-    initial_count = len(collected_list)
+    # initial_count = len(collected_list) # 이제 업데이트도 하므로 단순 count 비교는 의미가 적음
     
-    # 2. 크롤링 (이미 있는건 건너뜀)
+    # 2. 크롤링 (업데이트 필요한 항목은 다시 긁음)
     for category in TARGET_CATEGORIES:
         crawl_category(category, collected_list)
     
-    added_count = len(collected_list) - initial_count
-    print(f"Finished. New items added: {added_count}")
-
-    # 3. 변경사항이 있을 때만 저장
-    if added_count > 0:
-        save_data(collected_list)
-    else:
-        print("No new data found. Skipping save.")
+    # 3. 무조건 저장 (내용이 업데이트 되었을 수 있으므로)
+    save_data(collected_list)
 
 if __name__ == "__main__":
     run()

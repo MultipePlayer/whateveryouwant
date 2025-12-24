@@ -47,6 +47,9 @@
         .animate-spin-slow { animation: spin-slow 3s linear infinite; }
         @keyframes slide-up { from { transform: translate(-50%, 20px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
         .toast-enter { animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+        /* Highlight Style */
+        mark.highlight { background-color: rgba(234, 179, 8, 0.4); color: white; border-radius: 2px; padding: 0 2px; }
     </style>
 </head>
 <body class="bg-darkbg text-zinc-400">
@@ -58,11 +61,9 @@
         // --- Helper Functions ---
         
         // Find index of item that is currently playing (time is between start and end)
-        // Modified to use end time if available, or just start time logic
         const findIndexByTime = (script, time) => {
             if (!script || script.length === 0) return -1;
             
-            // Binary search optimized for finding the range
             let left = 0;
             let right = script.length - 1;
             let result = -1;
@@ -70,55 +71,37 @@
             while (left <= right) {
                 const mid = Math.floor((left + right) / 2);
                 const item = script[mid];
-                
-                // If we have explicit end time (from updated parser), use it
-                // Fallback logic improved: if next item exists, use its start as end. If not, +10s.
                 const endTime = item.end || (script[mid+1] ? script[mid+1].start : item.start + 10);
 
                 if (time >= item.start && time < endTime) {
-                    return mid; // Exact match found
+                    return mid; 
                 }
                 
                 if (time < item.start) {
                     right = mid - 1;
                 } else {
-                    // time >= endTime, so it's later
                     left = mid + 1;
-                    // Keep track of the last item that started before time
-                    // This acts as a fallback if gaps exist
                     result = mid; 
                 }
             }
             return result;
         };
 
-        // [UPGRADED] Overlap-based matching with Robust Logic
+        // Overlap-based matching with Robust Logic
         const getMatchingContent = (targetScript, startTime, endTime) => {
             if (!targetScript || targetScript.length === 0) return null;
             
-            // Default duration window if endTime is missing
             const safeEndTime = endTime || (startTime + 5);
             
-            // Filter items that overlap with the [startTime, safeEndTime] window
-            // An item overlaps if: (ItemStart < WindowEnd) AND (ItemEnd > WindowStart)
             const matches = targetScript.filter(t => {
-                // If explicit end missing, assume 5s or next start (but we don't have next here easily without index)
-                // Let's assume a minimum duration if end is missing.
                 const tEnd = t.end || (t.start + 5); 
-                
-                // Overlap condition:
-                // Allow a small tolerance (0.1s) to catch slightly misaligned subtitles
                 return (t.start < safeEndTime - 0.1) && (tEnd > startTime + 0.1);
             });
 
             if (matches.length === 0) {
-                // Fallback: Find the nearest subtitle that might have been missed due to gaps
-                // or just pick the one active at startTime
                 const idx = findIndexByTime(targetScript, startTime);
                 if (idx !== -1) {
                     const candidate = targetScript[idx];
-                     // Check if it's reasonably close (e.g. within 2 seconds of start)
-                     // or if it covers the start time
                     const cEnd = candidate.end || (candidate.start + 5);
                     if (cEnd > startTime) {
                          return { ...candidate, isFallback: true };
@@ -127,16 +110,35 @@
                 return null;
             }
 
-            // Combine text from all matched items
             const combinedText = matches.map(m => m.text).join(' ');
             const combinedPinyin = matches.map(m => m.pinyin || '').join(' ');
             
             return { 
                 text: combinedText, 
                 pinyin: combinedPinyin.trim() ? combinedPinyin : null,
-                start: matches[0].start // Use start of first match
+                start: matches[0].start 
             };
         };
+
+        // --- Components ---
+
+        // [NEW] Highlight Text Component
+        const HighlightText = React.memo(({ text, highlight }) => {
+            if (!highlight || !text) return <>{text}</>;
+            
+            // Escape RegExp special characters
+            const escapedHighlight = highlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const parts = text.split(new RegExp(`(${escapedHighlight})`, 'gi'));
+            
+            return (
+                <span>
+                    {parts.map((part, i) => 
+                        part.toLowerCase() === highlight.toLowerCase() ? 
+                        <mark key={i} className="highlight">{part}</mark> : part
+                    )}
+                </span>
+            );
+        });
 
         const Icon = React.memo(({ name, className = "w-5 h-5" }) => {
             if(name === 'skipBack') return <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 20 9 12l10-8v16Z"/><line x1="5" y1="19" x2="5" y2="5"/></svg>;
@@ -153,7 +155,9 @@
                 message: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />,
                 list: <React.Fragment><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></React.Fragment>,
                 globe: <React.Fragment><circle cx="12" cy="12" r="10" /><path d="M12 2a14.5 14.5 0 0 0 0 20" /><path d="M2 12h20" /></React.Fragment>,
-                alert: <React.Fragment><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></React.Fragment>
+                alert: <React.Fragment><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></React.Fragment>,
+                chevronDown: <path d="m6 9 6 6 6-6"/>,
+                check: <path d="M20 6 9 17l-5-5"/>
             };
 
             return (
@@ -165,15 +169,17 @@
 
         const ScriptItem = React.memo(({ 
             item, idx, isActive, onClick, baseLang, fontSizes, showPinyin, 
-            koContent, cnContent, enContent 
+            koContent, cnContent, enContent,
+            autoScroll, searchQuery 
         }) => {
             const itemRef = useRef(null);
 
             useEffect(() => {
-                if (isActive && itemRef.current) {
+                // [MODIFIED] Only scroll if autoScroll is true
+                if (isActive && itemRef.current && autoScroll) {
                     itemRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }
-            }, [isActive]);
+            }, [isActive, autoScroll]);
 
             return (
                 <div 
@@ -189,27 +195,29 @@
                         {new Date(item.start * 1000).toISOString().substr(14, 5)}
                     </div>
 
-                    {/* KO */}
+                    {/* KO - [MODIFIED] Use HighlightText */}
                     {koContent && (
                         <div style={{ fontSize: `${fontSizes.ko}px` }} className={`leading-relaxed mb-1.5 transition-colors ${baseLang==='ko' && isActive ? 'font-bold text-blue-300' : 'text-zinc-400 group-hover:text-zinc-300'}`}>
-                            {koContent.text}
+                            <HighlightText text={koContent.text} highlight={searchQuery} />
                         </div>
                     )}
 
-                    {/* CN */}
+                    {/* CN - [MODIFIED] Use HighlightText & Toggle Pinyin */}
                     {cnContent && (
                         <div className={`leading-relaxed mb-1.5 ${baseLang==='cn' && isActive ? 'font-bold text-zinc-200' : 'text-zinc-500 group-hover:text-zinc-400'}`}>
                             {showPinyin && cnContent.pinyin && (
                                 <div style={{ fontSize: `${fontSizes.cn * 0.75}px` }} className="text-blue-400/80 mb-0.5 font-light">{cnContent.pinyin}</div>
                             )}
-                            <div style={{ fontSize: `${fontSizes.cn}px` }} className="font-chinese-serif">{cnContent.text}</div>
+                            <div style={{ fontSize: `${fontSizes.cn}px` }} className="font-chinese-serif">
+                                <HighlightText text={cnContent.text} highlight={searchQuery} />
+                            </div>
                         </div>
                     )}
 
-                    {/* EN */}
+                    {/* EN - [MODIFIED] Use HighlightText */}
                     {enContent && (
                         <div style={{ fontSize: `${fontSizes.en}px` }} className={`italic leading-snug ${baseLang==='en' && isActive ? 'font-bold text-zinc-200' : 'text-zinc-600 group-hover:text-zinc-500'}`}>
-                            {enContent.text}
+                            <HighlightText text={enContent.text} highlight={searchQuery} />
                         </div>
                     )}
                 </div>
@@ -218,7 +226,7 @@
 
         const ScriptList = React.memo(({ 
             scripts, baseLang, activeIndex, onItemClick, searchQuery, 
-            fontSizes, showPinyin 
+            fontSizes, showPinyin, autoScroll 
         }) => {
             const baseScript = scripts[baseLang];
             if (!baseScript || baseScript.length === 0) {
@@ -226,6 +234,8 @@
             }
 
             let itemsToRender = baseScript;
+            // Note: Search filtering is done in the parent or here. 
+            // In the original, it was done here. We keep it but apply Highlighting inside Item.
             if (searchQuery.trim() !== '') {
                 const query = searchQuery.toLowerCase();
                 itemsToRender = baseScript.filter(item => item.text.toLowerCase().includes(query));
@@ -239,12 +249,9 @@
                         const originalIdx = scripts[baseLang].indexOf(item); 
                         const isActive = activeIndex === originalIdx;
 
-                        // Improved End Time Logic
                         const nextItem = scripts[baseLang][originalIdx + 1];
-                        // If current item has explict end, use it. Else infer from next start or add buffer.
                         const endTime = item.end || (nextItem ? nextItem.start : (item.start + 10));
 
-                        // Use Overlap Matcher
                         const koContent = baseLang === 'ko' ? item : getMatchingContent(scripts.ko, item.start, endTime);
                         const enContent = baseLang === 'en' ? item : getMatchingContent(scripts.en, item.start, endTime);
                         const cnContent = baseLang === 'cn' ? item : getMatchingContent(scripts.cn, item.start, endTime);
@@ -262,6 +269,8 @@
                                 koContent={koContent}
                                 cnContent={cnContent}
                                 enContent={enContent}
+                                autoScroll={autoScroll}
+                                searchQuery={searchQuery}
                             />
                         );
                     })}
@@ -277,14 +286,21 @@
             const [allItems, setAllItems] = useState([]);
             const [loading, setLoading] = useState(true);
             const [error, setError] = useState(null);
+            
+            // Search States
             const [searchQuery, setSearchQuery] = useState('');
             const [searchResults, setSearchResults] = useState([]);
             const [showSearchResults, setShowSearchResults] = useState(false);
+            const [searchScope, setSearchScope] = useState('all'); // [NEW] 'all', 'title', 'script'
+            const [expandedSearch, setExpandedSearch] = useState(false); // [NEW] Show more results
+
             const [selectedItem, setSelectedItem] = useState(null);
             
             const [audioLang, setAudioLang] = useState('ko');     
             const [baseLang, setBaseLang] = useState('ko');       
-            const [subtitleLang, setSubtitleLang] = useState('ko'); 
+            
+            // [MODIFIED] subtitleLang -> subtitleModes (Set for multiple selection)
+            const [subtitleModes, setSubtitleModes] = useState(new Set(['ko'])); 
             
             const [videoError, setVideoError] = useState(null);
             const [toastMessage, setToastMessage] = useState(null);
@@ -296,6 +312,11 @@
             const [isPlaying, setIsPlaying] = useState(false);
             const [loopMode, setLoopMode] = useState(false); 
             
+            // [NEW] Playback Speed
+            const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
+            // [NEW] Auto Scroll
+            const [autoScroll, setAutoScroll] = useState(true);
+
             const [selectedText, setSelectedText] = useState('');
             const [selectionPos, setSelectionPos] = useState({ x: 0, y: 0 });
             const [fontSizes, setFontSizes] = useState({ ko: 16, en: 15, cn: 18 });
@@ -304,10 +325,10 @@
             const [showDebug, setShowDebug] = useState(false); 
 
             const videoRef = useRef(null);
-            const subtitleRefs = { ko: useRef([]), en: useRef([]), cn: useRef([]) };
-            const scriptContainerRef = useRef(null); // Reference added here
+            const scriptContainerRef = useRef(null); 
 
             const langLabels = { ko: '한국어', en: '영어', cn: '중국어' };
+            const speedOptions = [0.5, 0.75, 0.8, 0.9, 1.0, 1.2, 1.5]; // [NEW] Detailed speeds
 
             const showToast = (msg) => {
                 setToastMessage(msg);
@@ -329,6 +350,7 @@
                                     const items = await res.json();
                                     return items.map(item => ({
                                         ...item,
+                                        // Keeping search index for 'all' search
                                         _searchIndex: JSON.stringify({ t: item.title, u: item.url, s: item.scripts }).toLowerCase()
                                     }));
                                 }
@@ -346,17 +368,103 @@
 
             useEffect(() => { loadData(); }, []);
 
+            // [MODIFIED] Enhanced Search Logic
             useEffect(() => {
                 const query = searchQuery.trim().toLowerCase();
                 if (query === '') {
                     setSearchResults([]);
                     setShowSearchResults(false);
+                    setExpandedSearch(false);
                 } else {
-                    const filtered = allItems.filter(item => item._searchIndex && item._searchIndex.includes(query));
+                    const filtered = allItems.filter(item => {
+                        if (searchScope === 'all') {
+                            return item._searchIndex && item._searchIndex.includes(query);
+                        } else if (searchScope === 'title') {
+                            return item.title && item.title.toLowerCase().includes(query);
+                        } else if (searchScope === 'script') {
+                            // Deep check in scripts
+                            if (!item.scripts) return false;
+                            const inKo = item.scripts.ko?.some(s => s.text.toLowerCase().includes(query));
+                            const inEn = item.scripts.en?.some(s => s.text.toLowerCase().includes(query));
+                            const inCn = item.scripts.cn?.some(s => s.text.toLowerCase().includes(query));
+                            return inKo || inEn || inCn;
+                        }
+                        return false;
+                    });
                     setSearchResults(filtered);
                     setShowSearchResults(true);
+                    setExpandedSearch(false);
                 }
-            }, [searchQuery, allItems]);
+            }, [searchQuery, allItems, searchScope]);
+
+            // [NEW] Speed Effect
+            useEffect(() => {
+                if (videoRef.current) {
+                    videoRef.current.playbackRate = playbackSpeed;
+                }
+            }, [playbackSpeed]);
+
+            // [NEW] Keyboard Shortcuts
+            useEffect(() => {
+                const handleKeyDown = (e) => {
+                    // Ignore if typing in input
+                    if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+
+                    const key = e.key.toLowerCase();
+                    
+                    switch(key) {
+                        case ' ': 
+                        case 'k':
+                            e.preventDefault();
+                            togglePlay();
+                            break;
+                        case 'arrowleft':
+                            if (videoRef.current) {
+                                videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 5);
+                                setCurrentTime(videoRef.current.currentTime);
+                                showToast("⏪ 5초 뒤로");
+                            }
+                            break;
+                        case 'arrowright':
+                            if (videoRef.current) {
+                                videoRef.current.currentTime = Math.min(duration, videoRef.current.currentTime + 5);
+                                setCurrentTime(videoRef.current.currentTime);
+                                showToast("⏩ 5초 앞으로");
+                            }
+                            break;
+                        case '[':
+                            setPlaybackSpeed(prev => {
+                                const idx = speedOptions.indexOf(prev);
+                                const newSpeed = idx > 0 ? speedOptions[idx - 1] : prev;
+                                showToast(`속도: ${newSpeed}x`);
+                                return newSpeed;
+                            });
+                            break;
+                        case ']':
+                            setPlaybackSpeed(prev => {
+                                const idx = speedOptions.indexOf(prev);
+                                const newSpeed = idx < speedOptions.length - 1 ? speedOptions[idx + 1] : prev;
+                                showToast(`속도: ${newSpeed}x`);
+                                return newSpeed;
+                            });
+                            break;
+                        case 'l':
+                            setLoopMode(prev => {
+                                showToast(prev ? "루프 해제" : "A-B 루프 켜짐");
+                                return !prev;
+                            });
+                            break;
+                        case 's':
+                            setAutoScroll(prev => {
+                                showToast(prev ? "자동 스크롤 꺼짐" : "자동 스크롤 켜짐");
+                                return !prev;
+                            });
+                            break;
+                    }
+                };
+                window.addEventListener('keydown', handleKeyDown);
+                return () => window.removeEventListener('keydown', handleKeyDown);
+            }, [duration, speedOptions]);
 
             const selectVideo = useCallback((item, initialLang = 'ko') => {
                 setSelectedItem(item);
@@ -368,7 +476,8 @@
                 setVideoError(null);
                 setAudioLang(initialLang);
                 setBaseLang(initialLang);
-                setSubtitleLang(initialLang === 'ko' ? 'en' : 'ko');
+                // [MODIFIED] Reset subtitle modes to opposite of audio
+                setSubtitleModes(new Set([initialLang === 'ko' ? 'en' : 'ko']));
                 setShowPlayerSettings(false);
             }, []);
 
@@ -376,6 +485,7 @@
                 e.preventDefault();
                 if (searchResults.length > 0) { selectVideo(searchResults[0]); return; }
                 
+                // Keep existing complex logic for direct URLs/JW links
                 let decodedQuery = searchQuery;
                 try { decodedQuery = decodeURIComponent(searchQuery); } catch (e) {}
 
@@ -451,7 +561,6 @@
                     const idx = findIndexByTime(script, v.currentTime);
                     if (idx !== -1) {
                         const currentItem = script[idx];
-                        // Use end time if available, otherwise estimate
                         const endTime = currentItem.end || (script[idx+1] ? script[idx+1].start : v.duration);
                         
                         if (v.currentTime >= endTime - 0.2) {
@@ -463,6 +572,9 @@
 
             const onLoadedData = () => {
                 if (videoRef.current) {
+                    // Sync speed
+                    videoRef.current.playbackRate = playbackSpeed;
+
                     Array.from(videoRef.current.textTracks).forEach(t => t.mode = 'disabled');
                     if (currentTime > 0) {
                         videoRef.current.currentTime = currentTime;
@@ -494,6 +606,17 @@
                 if (videoRef.current) videoRef.current.currentTime = time;
             }, []);
 
+            // [NEW] Toggle subtitle mode safely
+            const toggleSubtitleMode = (langId) => {
+                const newModes = new Set(subtitleModes);
+                if (newModes.has(langId)) {
+                    newModes.delete(langId);
+                } else {
+                    newModes.add(langId);
+                }
+                setSubtitleModes(newModes);
+            };
+
             if (loading) return <div className="flex items-center justify-center h-full bg-darkbg text-zinc-500"><div className="animate-spin rounded-full h-8 w-8 border-2 border-zinc-600 border-t-zinc-200"></div></div>;
             if (error) return <div className="flex items-center justify-center h-full text-red-400">{error}</div>;
 
@@ -507,30 +630,59 @@
                         </div>
                         
                         <form onSubmit={handleSearchSubmit} className="flex-1 max-w-lg mx-4 relative group">
-                            <div className="relative">
-                                <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-blue-500 transition-colors" />
+                            <div className="relative flex items-center bg-panel rounded-full border border-zinc-700 focus-within:border-blue-500 transition-colors">
+                                {/* [NEW] Search Scope Selector */}
+                                <div className="flex items-center pl-2">
+                                    <select 
+                                        value={searchScope} 
+                                        onChange={(e) => setSearchScope(e.target.value)}
+                                        className="bg-transparent text-[10px] text-zinc-400 font-bold outline-none cursor-pointer hover:text-white"
+                                    >
+                                        <option value="all">전체</option>
+                                        <option value="title">제목</option>
+                                        <option value="script">자막</option>
+                                    </select>
+                                    <div className="w-px h-3 bg-zinc-700 mx-2"></div>
+                                </div>
+
+                                <Icon name="search" className="w-4 h-4 text-zinc-500" />
                                 <input 
                                     type="text" 
-                                    placeholder="영상 제목 또는 URL 검색..." 
-                                    className="w-full bg-panel rounded-full py-2 pl-10 pr-10 outline-none text-sm transition-all focus:ring-1 focus:ring-blue-500 text-zinc-200 placeholder-zinc-600" 
+                                    placeholder="검색..." 
+                                    className="flex-1 bg-transparent py-2 px-2 outline-none text-sm text-zinc-200 placeholder-zinc-600" 
                                     value={searchQuery} 
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     onFocus={() => { if(searchQuery) setShowSearchResults(true); }}
                                 />
                                 {searchQuery && (
-                                    <button type="button" onClick={() => { setSearchQuery(''); setSearchResults([]); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300">
+                                    <button type="button" onClick={() => { setSearchQuery(''); setSearchResults([]); }} className="pr-3 text-zinc-500 hover:text-zinc-300">
                                         <Icon name="x" className="w-3.5 h-3.5" />
                                     </button>
                                 )}
                             </div>
+                            
+                            {/* [MODIFIED] Search Results with Highlight & Show More */}
                             {showSearchResults && searchResults.length > 0 && (
-                                <div className="absolute top-full left-0 right-0 mt-2 bg-panel rounded-xl shadow-xl border border-zinc-700 max-h-[60vh] overflow-y-auto custom-scrollbar z-50 p-1.5">
-                                    {searchResults.map(item => (
-                                        <button key={item.natural_key} type="button" onClick={() => selectVideo(item)} className="w-full text-left px-3 py-2.5 hover:bg-zinc-700 rounded-lg group transition-colors flex items-center justify-between">
-                                            <span className="font-medium text-sm text-zinc-300 group-hover:text-blue-400 truncate w-3/4">{item.title}</span>
-                                            <span className="text-[10px] text-zinc-500 font-medium px-1.5 py-0.5 rounded bg-zinc-800">재생</span>
+                                <div className="absolute top-full left-0 right-0 mt-2 bg-panel rounded-xl shadow-xl border border-zinc-700 max-h-[70vh] overflow-y-auto custom-scrollbar z-50 p-1.5">
+                                    {(expandedSearch ? searchResults : searchResults.slice(0, 5)).map(item => (
+                                        <button key={item.natural_key} type="button" onClick={() => selectVideo(item)} className="w-full text-left px-3 py-2.5 hover:bg-zinc-700 rounded-lg group transition-colors flex items-center justify-between border-b border-zinc-700/50 last:border-0">
+                                            <div className="flex-1 min-w-0 pr-2">
+                                                <div className="font-medium text-sm text-zinc-300 group-hover:text-blue-400 truncate">
+                                                    <HighlightText text={item.title} highlight={searchQuery} />
+                                                </div>
+                                            </div>
+                                            <span className="text-[10px] text-zinc-500 font-medium px-1.5 py-0.5 rounded bg-zinc-800 shrink-0">재생</span>
                                         </button>
                                     ))}
+                                    {searchResults.length > 5 && !expandedSearch && (
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setExpandedSearch(true)}
+                                            className="w-full text-center py-2 text-xs font-bold text-blue-400 hover:text-blue-300 hover:bg-zinc-700 rounded-lg mt-1"
+                                        >
+                                            더보기 ({searchResults.length - 5}개 더 있음)
+                                        </button>
+                                    )}
                                 </div>
                             )}
                         </form>
@@ -564,36 +716,45 @@
                                             playsInline autoPlay 
                                         />
                                         
+                                        {/* [MODIFIED] Center Play Button - Only show when paused or hovering? No, always when paused, or center overlay */}
                                         {!isPlaying && !videoError && (
-                                            <div className="absolute inset-0 flex items-center justify-center bg-black/40 pointer-events-none fade-in">
-                                                <div className="w-14 h-14 bg-white/10 backdrop-blur-sm rounded-full flex items-center justify-center text-white">
-                                                    <Icon name="play" className="w-6 h-6 ml-1 fill-current" />
+                                            <div className="absolute inset-0 flex items-center justify-center bg-black/20 pointer-events-none fade-in z-10">
+                                                <div className="w-16 h-16 bg-white/10 backdrop-blur-sm rounded-full flex items-center justify-center text-white border border-white/20 shadow-2xl">
+                                                    <Icon name="play" className="w-8 h-8 ml-1 fill-current" />
                                                 </div>
                                             </div>
                                         )}
 
-                                        {/* Overlay Subtitles (With Smart Sync) */}
+                                        {/* Overlay Subtitles (With Multiple Support) */}
                                         {!selectedItem.isExternal && !videoError && selectedItem.scripts && (
-                                            <div className="absolute bottom-6 left-0 right-0 px-4 text-center pointer-events-none">
+                                            <div className="absolute bottom-6 left-0 right-0 px-4 text-center pointer-events-none flex flex-col items-center gap-2">
+                                                {/* Base Language always visible if needed, or controlled? Existing logic showed base + subtitle. 
+                                                    Requirements: "Duplicate display". We will render the base first, then others from Set.
+                                                */}
                                                 <div className="inline-block bg-black/70 backdrop-blur-md px-6 py-3 rounded-xl shadow-lg max-w-full">
+                                                     {/* Base Lang */}
                                                     <div className={`text-white font-semibold leading-relaxed drop-shadow-sm transition-all duration-300 ${baseLang === 'cn' ? 'font-chinese-serif text-2xl tracking-wide' : 'text-xl'}`}>
                                                         {selectedItem.scripts[baseLang]?.[activeIndices.base]?.text}
                                                     </div>
                                                     
-                                                    {/* Smart Sync for Overlay */}
-                                                    {subtitleLang !== baseLang && (
-                                                        <div className={`text-zinc-300 text-base mt-1.5 font-medium ${subtitleLang === 'cn' ? 'font-chinese-serif' : ''}`}>
-                                                            {(() => {
-                                                                const baseItem = selectedItem.scripts[baseLang]?.[activeIndices.base];
-                                                                if (!baseItem) return null;
-                                                                
-                                                                const endTime = baseItem.end || (selectedItem.scripts[baseLang][activeIndices.base+1] ? selectedItem.scripts[baseLang][activeIndices.base+1].start : (baseItem.start + 10));
-                                                                
-                                                                const matched = getMatchingContent(selectedItem.scripts[subtitleLang], baseItem.start, endTime);
-                                                                return matched ? matched.text : '';
-                                                            })()}
-                                                        </div>
-                                                    )}
+                                                    {/* [MODIFIED] Render Multiple Subtitle Modes */}
+                                                    {Array.from(subtitleModes).map(mode => {
+                                                        if (mode === baseLang) return null; // Already shown
+                                                        
+                                                        const baseItem = selectedItem.scripts[baseLang]?.[activeIndices.base];
+                                                        if (!baseItem) return null;
+                                                        
+                                                        const endTime = baseItem.end || (selectedItem.scripts[baseLang][activeIndices.base+1] ? selectedItem.scripts[baseLang][activeIndices.base+1].start : (baseItem.start + 10));
+                                                        const matched = getMatchingContent(selectedItem.scripts[mode], baseItem.start, endTime);
+                                                        
+                                                        if (!matched) return null;
+
+                                                        return (
+                                                            <div key={mode} className={`text-zinc-300 text-base mt-1.5 font-medium border-t border-white/10 pt-1 ${mode === 'cn' ? 'font-chinese-serif' : ''}`}>
+                                                                {matched.text}
+                                                            </div>
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
                                         )}
@@ -614,7 +775,7 @@
                                         )}
                                     </div>
 
-                                    {/* CONTROLS */}
+                                    {/* [MODIFIED] CONTROLS - Simplified Bottom Bar */}
                                     <div className="bg-panel border-t border-zinc-800 p-3 shrink-0 z-20">
                                         <div className="flex items-center gap-3 text-[10px] font-mono font-medium text-zinc-400 mb-2">
                                             <span>{new Date(currentTime * 1000).toISOString().substr(14, 5)}</span>
@@ -623,22 +784,14 @@
                                         </div>
 
                                         <div className="flex flex-wrap items-center justify-between gap-3">
-                                            <div className="flex items-center gap-3">
-                                                <button onClick={() => {if(videoRef.current) videoRef.current.currentTime -= 5}} className="p-2 rounded-full hover:bg-zinc-800 text-zinc-400 transition-colors"><Icon name="skipBack" /></button>
-                                                <button onClick={togglePlay} className="w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center shadow-lg transition-transform active:scale-95">
-                                                    {isPlaying ? <Icon name="pause" className="fill-current w-4 h-4" /> : <Icon name="play" className="ml-0.5 fill-current w-4 h-4" />}
-                                                </button>
-                                                <button onClick={() => {if(videoRef.current) videoRef.current.currentTime += 5}} className="p-2 rounded-full hover:bg-zinc-800 text-zinc-400 transition-colors"><Icon name="skipForward" /></button>
-                                            </div>
-
+                                            {/* Left: Audio Toggle (Essential) */}
                                             {!selectedItem.isExternal && (
-                                                <div className="flex items-center gap-1 overflow-x-auto no-scrollbar ml-auto">
-                                                    <span className="text-[9px] font-bold text-zinc-600 mr-1 uppercase">오디오</span>
-                                                    {[{ id: 'ko', label: '한국어' }, { id: 'en', label: '영어' }, { id: 'cn', label: '중국어' }].map(l => (
+                                                <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+                                                    {[{ id: 'ko', label: 'KR' }, { id: 'en', label: 'EN' }, { id: 'cn', label: 'CN' }].map(l => (
                                                         <button 
                                                             key={l.id} 
                                                             onClick={() => setAudioLang(l.id)} 
-                                                            className={`px-2.5 py-1 text-[10px] font-bold rounded transition-all whitespace-nowrap ${audioLang === l.id ? 'bg-zinc-200 text-black' : 'text-zinc-500 hover:text-zinc-300 bg-zinc-800'}`}
+                                                            className={`px-2 py-1 text-[10px] font-bold rounded transition-all whitespace-nowrap ${audioLang === l.id ? 'bg-zinc-200 text-black' : 'text-zinc-500 hover:text-zinc-300 bg-zinc-800'}`}
                                                         >
                                                             {l.label}
                                                         </button>
@@ -646,34 +799,65 @@
                                                 </div>
                                             )}
 
+                                            {/* Center: A-B Loop (Exposed as requested) */}
+                                            <div className="flex items-center justify-center flex-1">
+                                                 <button 
+                                                    onClick={() => setLoopMode(!loopMode)} 
+                                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all ${loopMode ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}
+                                                >
+                                                    <Icon name="repeat" className="w-4 h-4" />
+                                                    <span className="text-xs font-bold">{loopMode ? 'On' : 'Off'}</span>
+                                                </button>
+                                            </div>
+
+                                            {/* Right: Settings Toggle */}
                                             <div className="relative">
                                                 <button 
                                                     onClick={() => setShowPlayerSettings(!showPlayerSettings)} 
-                                                    className={`p-2 rounded-full transition-colors ${showPlayerSettings ? 'bg-zinc-800 text-blue-400' : 'text-zinc-400 hover:text-zinc-200'}`}
+                                                    className={`p-2 rounded-full transition-colors flex items-center gap-1 ${showPlayerSettings ? 'bg-zinc-800 text-blue-400' : 'text-zinc-400 hover:text-zinc-200'}`}
                                                 >
+                                                    <span className="text-[10px] font-bold">{playbackSpeed}x</span>
                                                     <Icon name="settings" className="w-5 h-5" />
                                                 </button>
+
+                                                {/* [MODIFIED] Player Settings Popup */}
                                                 {showPlayerSettings && (
-                                                    <div className="absolute bottom-full right-0 mb-3 bg-panel border border-zinc-700 rounded-xl shadow-2xl p-3 w-40 popup-enter z-50">
-                                                        <button onClick={() => setLoopMode(!loopMode)} className="w-full flex items-center justify-between p-2 rounded hover:bg-zinc-800 transition-colors mb-2">
-                                                            <span className="text-xs font-bold text-zinc-300 flex items-center gap-2"><Icon name="repeat" className="w-3.5 h-3.5" /> 구간 반복</span>
-                                                            <div className={`w-8 h-4 rounded-full relative transition-colors ${loopMode ? 'bg-blue-500' : 'bg-zinc-700'}`}>
-                                                                <div className={`w-2.5 h-2.5 bg-white rounded-full absolute top-0.5 transition-all ${loopMode ? 'left-5' : 'left-0.5'}`} />
+                                                    <div className="absolute bottom-full right-0 mb-3 bg-panel border border-zinc-700 rounded-xl shadow-2xl p-4 w-52 popup-enter z-50">
+                                                        
+                                                        {/* Speed Settings */}
+                                                        <div className="mb-4">
+                                                            <div className="text-[10px] font-bold text-zinc-500 uppercase px-1 mb-2">배속</div>
+                                                            <div className="grid grid-cols-4 gap-1">
+                                                                {speedOptions.map(rate => (
+                                                                    <button 
+                                                                        key={rate} 
+                                                                        onClick={() => setPlaybackSpeed(rate)}
+                                                                        className={`text-[10px] font-bold py-1.5 rounded transition-colors ${playbackSpeed === rate ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}
+                                                                    >
+                                                                        {rate}
+                                                                    </button>
+                                                                ))}
                                                             </div>
-                                                        </button>
+                                                        </div>
+
+                                                        {/* Subtitle Mode Settings */}
                                                         {!selectedItem.isExternal && (
                                                             <div>
-                                                                <div className="text-[9px] font-bold text-zinc-500 uppercase px-1 mb-1">자막 언어</div>
-                                                                <div className="grid grid-cols-3 gap-1">
-                                                                    {[{ id: 'ko', label: '한국어' }, { id: 'en', label: '영어' }, { id: 'cn', label: '중국어' }].map(l => (
-                                                                        <button 
-                                                                            key={l.id} 
-                                                                            onClick={() => setSubtitleLang(l.id)} 
-                                                                            className={`py-1 text-[10px] font-bold rounded transition-all ${subtitleLang === l.id ? 'bg-blue-900/50 text-blue-400' : 'text-zinc-500 hover:bg-zinc-800'}`}
-                                                                        >
-                                                                            {l.label}
-                                                                        </button>
-                                                                    ))}
+                                                                <div className="text-[10px] font-bold text-zinc-500 uppercase px-1 mb-2">자막 모드 (다중 선택)</div>
+                                                                <div className="flex flex-col gap-1">
+                                                                    {[{ id: 'ko', label: '한국어' }, { id: 'en', label: '영어' }, { id: 'cn', label: '중국어' }].map(l => {
+                                                                        const isActive = subtitleModes.has(l.id);
+                                                                        return (
+                                                                            <button 
+                                                                                key={l.id} 
+                                                                                onClick={() => toggleSubtitleMode(l.id)} 
+                                                                                className={`flex items-center justify-between px-2 py-1.5 text-[11px] font-bold rounded transition-all ${isActive ? 'bg-zinc-700 text-blue-400' : 'text-zinc-500 hover:bg-zinc-800'}`}
+                                                                            >
+                                                                                <span>{l.label}</span>
+                                                                                {isActive && <Icon name="check" className="w-3 h-3" />}
+                                                                            </button>
+                                                                        );
+                                                                    })}
                                                                 </div>
                                                             </div>
                                                         )}
@@ -699,7 +883,12 @@
                                                     {[{ id: 'ko', label: '한국어' }, { id: 'en', label: '영어' }, { id: 'cn', label: '중국어' }].map(l => (
                                                         <button 
                                                             key={l.id} 
-                                                            onClick={() => { setBaseLang(l.id); setSubtitleLang(l.id === 'ko' ? 'en' : 'ko'); }} 
+                                                            onClick={() => { 
+                                                                setBaseLang(l.id); 
+                                                                // Ensure base lang is not in overlay to prevent dupes, or user manages? 
+                                                                // Let's reset default logic: overlay becomes 'en' if 'ko' is base
+                                                                setSubtitleModes(new Set([l.id === 'ko' ? 'en' : 'ko']));
+                                                            }} 
                                                             className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${baseLang === l.id ? 'bg-zinc-700 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
                                                         >
                                                             {l.label}
@@ -707,9 +896,19 @@
                                                     ))}
                                                 </div>
                                             </div>
-                                            <button onClick={() => setShowRightSettings(!showRightSettings)} className={`p-2 rounded-lg transition-colors ${showRightSettings ? 'bg-zinc-800 text-blue-400' : 'text-zinc-500 hover:text-zinc-300'}`}>
-                                                <Icon name="settings" className="w-4 h-4" />
-                                            </button>
+
+                                            {/* [NEW] Auto Scroll Toggle & Right Settings */}
+                                            <div className="flex items-center gap-2">
+                                                <button 
+                                                    onClick={() => setAutoScroll(!autoScroll)}
+                                                    className={`px-2 py-1 rounded-md text-[10px] font-bold border transition-colors ${autoScroll ? 'border-blue-500/50 text-blue-400 bg-blue-500/10' : 'border-zinc-700 text-zinc-500'}`}
+                                                >
+                                                    {autoScroll ? '자동 스크롤 On' : '자동 스크롤 Off'}
+                                                </button>
+                                                <button onClick={() => setShowRightSettings(!showRightSettings)} className={`p-2 rounded-lg transition-colors ${showRightSettings ? 'bg-zinc-800 text-blue-400' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                                                    <Icon name="settings" className="w-4 h-4" />
+                                                </button>
+                                            </div>
                                         </div>
 
                                         {showRightSettings && (
@@ -738,7 +937,7 @@
                                             <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
                                             <input 
                                                 type="text" 
-                                                placeholder="자막 검색..." 
+                                                placeholder="현재 스크립트 내 검색..." 
                                                 className="w-full bg-zinc-900 border border-transparent focus:border-blue-500 rounded-lg py-2 pl-9 pr-3 text-xs outline-none transition-all placeholder:text-zinc-600 text-zinc-300"
                                                 value={scriptSearchQuery}
                                                 onChange={(e) => setScriptSearchQuery(e.target.value)}
@@ -750,7 +949,7 @@
                                 )}
                             </div>
 
-                            {/* Script List: Render Memoized List */}
+                            {/* Script List */}
                             {selectedItem && !selectedItem.isExternal && selectedItem.scripts && (
                                 <div 
                                     className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-darkbg" 
@@ -776,7 +975,7 @@
                                         searchQuery={scriptSearchQuery}
                                         fontSizes={fontSizes}
                                         showPinyin={showPinyin}
-                                        selectedItem={selectedItem}
+                                        autoScroll={autoScroll}
                                     />
                                 </div>
                             )}

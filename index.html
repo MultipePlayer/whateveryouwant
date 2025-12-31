@@ -202,6 +202,8 @@
             if(name === 'skipForward') return <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m5 4 10 8-10 8V4Z"/><line x1="19" y1="5" x2="19" y2="19"/></svg>;
             if(name === 'repeat') return <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>;
             if(name === 'info') return <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>;
+            if(name === 'arrowUp') return <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>;
+            if(name === 'arrowDown') return <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>;
 
             const icons = {
                 play: <path d="m5 3 14 9-14 9V3z" />,
@@ -228,7 +230,7 @@
         const ScriptItem = React.memo(({ 
             item, idx, isActive, onClick, baseLang, fontSizes, showPinyin, 
             koContent, cnContent, enContent,
-            autoScroll, searchQuery 
+            autoScroll, searchQuery, langOrder, visibleLangs 
         }) => {
             const itemRef = useRef(null);
 
@@ -237,6 +239,37 @@
                     itemRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }
             }, [isActive, autoScroll]);
+
+            const renderContent = (lang) => {
+                if (!visibleLangs[lang]) return null;
+
+                if (lang === 'ko') {
+                    return koContent && (
+                        <div key={lang} style={{ fontSize: `${fontSizes.ko}px` }} className={`leading-relaxed mb-1 transition-colors cursor-text select-text ${baseLang==='ko' && isActive ? 'font-bold text-blue-400' : 'text-zinc-300 group-hover:text-white'}`}>
+                            <HighlightText text={koContent.text} highlight={searchQuery} />
+                        </div>
+                    );
+                } else if (lang === 'cn') {
+                    return cnContent && (
+                        <div key={lang} className={`leading-relaxed mb-1 cursor-text select-text ${baseLang==='cn' && isActive ? 'font-bold text-zinc-200' : 'text-zinc-400 group-hover:text-zinc-300'}`}>
+                            {/* [MODIFIED] Enhanced Pinyin Display */}
+                            {showPinyin && cnContent.pinyin && (
+                                <div style={{ fontSize: `${Math.max(10, fontSizes.cn * 0.7)}px` }} className="text-blue-400/80 mb-0.5 font-light">{cnContent.pinyin}</div>
+                            )}
+                            <div style={{ fontSize: `${fontSizes.cn}px` }} className="font-chinese-serif">
+                                <HighlightText text={cnContent.text} highlight={searchQuery} />
+                            </div>
+                        </div>
+                    );
+                } else if (lang === 'en') {
+                    return enContent && (
+                        <div key={lang} style={{ fontSize: `${fontSizes.en}px` }} className={`italic leading-snug cursor-text select-text ${baseLang==='en' && isActive ? 'font-bold text-zinc-200' : 'text-zinc-400 group-hover:text-zinc-300'}`}>
+                            <HighlightText text={enContent.text} highlight={searchQuery} />
+                        </div>
+                    );
+                }
+                return null;
+            };
 
             return (
                 <div 
@@ -252,36 +285,14 @@
                         {new Date(item.start * 1000).toISOString().substr(14, 5)}
                     </div>
 
-                    {koContent && (
-                        <div style={{ fontSize: `${fontSizes.ko}px` }} className={`leading-relaxed mb-1 transition-colors cursor-text select-text ${baseLang==='ko' && isActive ? 'font-bold text-blue-400' : 'text-zinc-300 group-hover:text-white'}`}>
-                            <HighlightText text={koContent.text} highlight={searchQuery} />
-                        </div>
-                    )}
-
-                    {cnContent && (
-                        <div className={`leading-relaxed mb-1 cursor-text select-text ${baseLang==='cn' && isActive ? 'font-bold text-zinc-200' : 'text-zinc-400 group-hover:text-zinc-300'}`}>
-                            {/* [MODIFIED] Enhanced Pinyin Display */}
-                            {showPinyin && cnContent.pinyin && (
-                                <div style={{ fontSize: `${Math.max(10, fontSizes.cn * 0.7)}px` }} className="text-blue-400/80 mb-0.5 font-light">{cnContent.pinyin}</div>
-                            )}
-                            <div style={{ fontSize: `${fontSizes.cn}px` }} className="font-chinese-serif">
-                                <HighlightText text={cnContent.text} highlight={searchQuery} />
-                            </div>
-                        </div>
-                    )}
-
-                    {enContent && (
-                        <div style={{ fontSize: `${fontSizes.en}px` }} className={`italic leading-snug cursor-text select-text ${baseLang==='en' && isActive ? 'font-bold text-zinc-200' : 'text-zinc-400 group-hover:text-zinc-300'}`}>
-                            <HighlightText text={enContent.text} highlight={searchQuery} />
-                        </div>
-                    )}
+                    {langOrder.map(lang => renderContent(lang))}
                 </div>
             );
         });
 
         const ScriptList = React.memo(({ 
             scripts, baseLang, activeIndex, onItemClick, searchQuery, 
-            fontSizes, showPinyin, autoScroll 
+            fontSizes, showPinyin, autoScroll, langOrder, visibleLangs 
         }) => {
             const baseScript = scripts[baseLang];
             if (!baseScript || baseScript.length === 0) {
@@ -324,6 +335,8 @@
                                 enContent={enContent}
                                 autoScroll={autoScroll}
                                 searchQuery={searchQuery}
+                                langOrder={langOrder}
+                                visibleLangs={visibleLangs}
                             />
                         );
                     })}
@@ -374,6 +387,10 @@
             const [fontSizes, setFontSizes] = useState({ ko: 18, en: 16, cn: 20 });
             const [showPinyin, setShowPinyin] = useState(true);
             const [scriptSearchQuery, setScriptSearchQuery] = useState('');
+
+            // [NEW] Language Order and Visibility States
+            const [langOrder, setLangOrder] = useState(['ko', 'en', 'cn']);
+            const [visibleLangs, setVisibleLangs] = useState({ ko: true, en: true, cn: true });
 
             const videoRef = useRef(null);
             const scriptContainerRef = useRef(null); 
@@ -519,7 +536,7 @@
                 }
                 if (searchQuery.startsWith('http')) {
                     selectVideo({
-                        title: "外部 링크 영상",
+                        title: "외부 링크 영상",
                         url: searchQuery,
                         scripts: { ko: [], en: [], cn: [] },
                         natural_key: "ext_" + Date.now(),
@@ -629,6 +646,34 @@
                 setSubtitleModes(newModes);
             };
 
+            // [NEW] Language Reordering Logic
+            const moveLang = (index, direction) => {
+                const newOrder = [...langOrder];
+                if (direction === 'up' && index > 0) {
+                    [newOrder[index], newOrder[index - 1]] = [newOrder[index - 1], newOrder[index]];
+                } else if (direction === 'down' && index < newOrder.length - 1) {
+                    [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
+                }
+                setLangOrder(newOrder);
+            };
+
+            const toggleLangVisibility = (langId) => {
+                setVisibleLangs(prev => ({ ...prev, [langId]: !prev[langId] }));
+            };
+
+            // [NEW] Auto-scroll to top and reorder when base language changes
+            useEffect(() => {
+                if (scriptContainerRef.current) {
+                    scriptContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+                // Auto-sort base language to top
+                setLangOrder(prev => {
+                    const newOrder = [baseLang, ...prev.filter(l => l !== baseLang)];
+                    return newOrder;
+                });
+            }, [baseLang]);
+
+
             if (loading) return <div className="flex items-center justify-center h-full bg-darkbg text-zinc-500"><div className="animate-spin rounded-full h-8 w-8 border-2 border-zinc-600 border-t-zinc-200"></div></div>;
             if (error) return <div className="flex items-center justify-center h-full text-red-400">{error}</div>;
 
@@ -641,7 +686,7 @@
                             <span className="font-bold text-base tracking-tight hidden sm:block text-zinc-200">Language Player</span>
                         </div>
                         
-                        {/* [MODIFIED] Mobile-Friendly Search Bar */}
+                        {/* Mobile-Friendly Search Bar */}
                         <form onSubmit={handleSearchSubmit} className="flex-1 max-w-2xl mx-auto relative group">
                             <div className="relative flex items-center bg-panel rounded-full border border-zinc-600 focus-within:border-blue-500 transition-colors h-11 shadow-lg w-full">
                                 
@@ -721,7 +766,7 @@
                         <div className="w-0 sm:w-8 shrink-0"></div> 
                     </header>
 
-                    {/* [MODIFIED] Mobile Layout */}
+                    {/* Mobile Layout */}
                     <main className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
                         {/* Video Player */}
                         <div className="w-full h-[35vh] flex-none md:w-[40%] md:h-full flex flex-col min-w-0 bg-black relative group border-b md:border-b-0 md:border-r border-zinc-800">
@@ -852,7 +897,7 @@
                                                     <Icon name="settings" className="w-5 h-5" />
                                                 </button>
 
-                                                {/* [MODIFIED] Mobile-Friendly Settings Popup */}
+                                                {/* Mobile-Friendly Settings Popup */}
                                                 {showPlayerSettings && (
                                                     <div className="absolute bottom-full right-0 mb-4 bg-panel border border-zinc-700 rounded-xl shadow-2xl p-5 w-60 popup-enter z-50 max-w-[90vw]">
                                                         <div className="mb-5">
@@ -947,8 +992,7 @@
                                                     <button onClick={() => setShowPinyin(!showPinyin)} className={`text-[11px] font-bold px-3 py-1 rounded border transition-colors ${showPinyin ? 'bg-blue-600 border-blue-600 text-white' : 'border-zinc-600 text-zinc-400'}`}>{showPinyin ? '켜짐' : '꺼짐'}</button>
                                                 </div>
                                                 
-                                                {/* Compact Font Settings */}
-                                                <div className="space-y-1"> 
+                                                <div className="space-y-1 border-b border-zinc-700 pb-3 mb-3"> 
                                                     {[{id:'ko', name:'KR'}, {id:'en', name:'EN'}, {id:'cn', name:'CN'}].map(lang => (
                                                         <div key={lang.id} className="flex items-center gap-2">
                                                             <span className="text-[10px] font-bold text-zinc-500 w-6">{lang.name}</span>
@@ -964,6 +1008,27 @@
                                                             <span className="text-[10px] w-6 text-right text-zinc-500">{fontSizes[lang.id]}</span>
                                                         </div>
                                                     ))}
+                                                </div>
+
+                                                {/* [NEW] Language Order & Visibility UI */}
+                                                <div>
+                                                    <div className="text-[10px] font-bold text-zinc-500 uppercase mb-2">언어 순서 및 표시</div>
+                                                    <div className="space-y-1">
+                                                        {langOrder.map((langId, idx) => (
+                                                            <div key={langId} className="flex items-center justify-between bg-zinc-800 rounded px-2 py-1">
+                                                                <span className="text-xs font-bold text-zinc-300 uppercase">{langId}</span>
+                                                                <div className="flex items-center gap-1">
+                                                                    <button onClick={() => toggleLangVisibility(langId)} className={`text-[9px] px-1.5 py-0.5 rounded ${visibleLangs[langId] ? 'bg-blue-500/20 text-blue-400' : 'bg-zinc-700 text-zinc-500'}`}>
+                                                                        {visibleLangs[langId] ? 'On' : 'Off'}
+                                                                    </button>
+                                                                    <div className="flex flex-col">
+                                                                        <button disabled={idx===0} onClick={() => moveLang(idx, 'up')} className="hover:text-white disabled:opacity-30"><Icon name="arrowUp" className="w-3 h-3" /></button>
+                                                                        <button disabled={idx===langOrder.length-1} onClick={() => moveLang(idx, 'down')} className="hover:text-white disabled:opacity-30"><Icon name="arrowDown" className="w-3 h-3" /></button>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
                                                 </div>
                                             </div>
                                         )}
@@ -1014,13 +1079,15 @@
                                         fontSizes={fontSizes}
                                         showPinyin={showPinyin}
                                         autoScroll={autoScroll}
+                                        langOrder={langOrder}
+                                        visibleLangs={visibleLangs}
                                     />
                                 </div>
                             )}
                         </div>
                     </main>
 
-                    {/* [MODIFIED] Dictionary Tooltip with Daum */}
+                    {/* Dictionary Tooltip with Daum */}
                     {selectedText && (
                         <div 
                             className="fixed z-50 bg-zinc-800 shadow-2xl rounded-xl p-2 flex gap-2 border border-zinc-700 animate-in zoom-in-95 duration-200" 
@@ -1034,7 +1101,7 @@
                         </div>
                     )}
 
-                    {/* [NEW] Footer */}
+                    {/* Footer */}
                     <footer className="p-4 text-center text-zinc-500 text-[10px] md:text-xs border-t border-zinc-800 bg-darkbg shrink-0 safe-pb">
                         문의하기: <a href="mailto:maybenewmail@gmail.com" className="hover:text-zinc-300 underline">maybenewmail@gmail.com</a>
                     </footer>

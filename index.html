@@ -148,7 +148,7 @@
                 if (idx !== -1) {
                     const candidate = targetScript[idx];
                     if (Math.abs(candidate.start - startTime) < 1.0) {
-                         return { ...candidate, isFallback: true };
+                          return { ...candidate, isFallback: true };
                     }
                 }
                 return null;
@@ -381,6 +381,8 @@
             
             // Search States
             const [searchQuery, setSearchQuery] = useState('');
+            // [NEW] Debounced Query for Performance
+            const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
             const [searchResults, setSearchResults] = useState([]);
             const [showSearchResults, setShowSearchResults] = useState(false);
             const [searchScope, setSearchScope] = useState('all'); 
@@ -389,7 +391,7 @@
 
             const [selectedItem, setSelectedItem] = useState(null);
             
-            const [audioLang, setAudioLang] = useState('ko');      
+            const [audioLang, setAudioLang] = useState('ko');       
             const [baseLang, setBaseLang] = useState('ko');       
             
             const [subtitleModes, setSubtitleModes] = useState(new Set(['ko'])); 
@@ -486,32 +488,68 @@
                 return () => document.removeEventListener('mousedown', handleClickOutside);
             }, []);
 
+            // [NEW] Debounce Input (0.3초)
             useEffect(() => {
-                const query = searchQuery.trim().toLowerCase();
+                const handler = setTimeout(() => {
+                    setDebouncedSearchQuery(searchQuery);
+                }, 300); // 300ms debounce
+                return () => clearTimeout(handler);
+            }, [searchQuery]);
+
+            // [NEW] Advanced Search Logic (Hit Count & Sort) with Debounce
+            useEffect(() => {
+                const query = debouncedSearchQuery.trim().toLowerCase();
                 if (query === '') {
                     setSearchResults([]);
                     setShowSearchResults(false);
                     setExpandedSearch(false);
                 } else {
-                    const filtered = allItems.filter(item => {
-                        if (searchScope === 'all') {
-                            return item._searchIndex && item._searchIndex.includes(query);
-                        } else if (searchScope === 'title') {
-                            return item.title && item.title.toLowerCase().includes(query);
-                        } else if (searchScope === 'script') {
-                            if (!item.scripts) return false;
-                            const inKo = item.scripts.ko?.some(s => s.text.toLowerCase().includes(query));
-                            const inEn = item.scripts.en?.some(s => s.text.toLowerCase().includes(query));
-                            const inCn = item.scripts.cn?.some(s => s.text.toLowerCase().includes(query));
-                            return inKo || inEn || inCn;
+                    // 1. Calculate Hits & Match Info
+                    const resultsWithHits = allItems.map(item => {
+                        let hits = 0;
+                        let matchedScriptPreview = null;
+                        let isMatch = false;
+
+                        // Title Match
+                        if (searchScope === 'all' || searchScope === 'title') {
+                             if (item.title && item.title.toLowerCase().includes(query)) {
+                                 isMatch = true;
+                                 // Title match doesn't increment hit count (as per request for frequency display)
+                             }
                         }
-                        return false;
+
+                        // Script Match & Count
+                        if (searchScope === 'all' || searchScope === 'script') {
+                            if (item.scripts) {
+                                ['ko', 'en', 'cn'].forEach(lang => {
+                                    item.scripts[lang]?.forEach(s => {
+                                        if (s.text && s.text.toLowerCase().includes(query)) {
+                                            const countInLine = (s.text.toLowerCase().split(query).length - 1);
+                                            if (countInLine > 0) {
+                                                isMatch = true;
+                                                hits += countInLine;
+                                                if (!matchedScriptPreview) matchedScriptPreview = s.text;
+                                            }
+                                        }
+                                    });
+                                });
+                            }
+                        }
+
+                        return { ...item, _hitCount: hits, _matchedPreview: matchedScriptPreview, _isMatch: isMatch };
                     });
+
+                    // 2. Filter
+                    const filtered = resultsWithHits.filter(item => item._isMatch);
+
+                    // 3. Sort (Hits Descending, then Title length/accuracy if needed)
+                    filtered.sort((a, b) => b._hitCount - a._hitCount);
+
                     setSearchResults(filtered);
                     setShowSearchResults(true);
                     setExpandedSearch(false);
                 }
-            }, [searchQuery, allItems, searchScope]);
+            }, [debouncedSearchQuery, allItems, searchScope]);
 
             useEffect(() => {
                 if (videoRef.current) {
@@ -526,7 +564,7 @@
                     switch(key) {
                         case ' ': 
                         case 'k': e.preventDefault(); togglePlay(); break;
-                        case 'arrowleft': if (videoRef.current) { videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 5); setCurrentTime(videoRef.current.currentTime); showToast("⏪ 5초 뒤로"); } break;
+                        case 'arrowleft': if (videoRef.current) { videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 5); setCurrentTime(videoRef.current.currentTime); showToast("⏩ 5초 뒤로"); } break;
                         case 'arrowright': if (videoRef.current) { videoRef.current.currentTime = Math.min(duration, videoRef.current.currentTime + 5); setCurrentTime(videoRef.current.currentTime); showToast("⏩ 5초 앞으로"); } break;
                         case '[': setPlaybackSpeed(prev => { const idx = speedOptions.indexOf(prev); const newSpeed = idx > 0 ? speedOptions[idx - 1] : prev; showToast(`속도: ${newSpeed}x`); return newSpeed; }); break;
                         case ']': setPlaybackSpeed(prev => { const idx = speedOptions.indexOf(prev); const newSpeed = idx < speedOptions.length - 1 ? speedOptions[idx + 1] : prev; showToast(`속도: ${newSpeed}x`); return newSpeed; }); break;
@@ -722,9 +760,10 @@
                         
                         {/* Mobile-Friendly Search Bar */}
                         <form onSubmit={handleSearchSubmit} className="flex-1 max-w-2xl mx-auto relative group">
-                            <div className="relative flex items-center bg-lightpanel dark:bg-panel rounded-full border border-slate-300 dark:border-zinc-600 focus-within:border-blue-500 transition-colors h-11 shadow-sm dark:shadow-lg w-full">
+                            {/* [MODIFIED] Added z-[60] to the container div to ensure it's higher than search results (z-50) */}
+                            <div className="relative flex items-center bg-lightpanel dark:bg-panel rounded-full border border-slate-300 dark:border-zinc-600 focus-within:border-blue-500 transition-colors h-11 shadow-sm dark:shadow-lg w-full z-[60]">
                                 
-                                <div className="relative" ref={scopeMenuRef}>
+                                <div className="relative z-20" ref={scopeMenuRef}>
                                     <button 
                                         type="button" 
                                         onClick={() => setShowScopeMenu(!showScopeMenu)}
@@ -738,7 +777,7 @@
                                     </button>
                                     
                                     {showScopeMenu && (
-                                        <div className="absolute top-full left-0 mt-2 w-24 bg-lightpanel dark:bg-panel border border-slate-200 dark:border-zinc-700 rounded-lg shadow-xl py-1 z-50 animate-slide-down overflow-hidden">
+                                        <div className="absolute top-full left-0 mt-2 w-24 bg-lightpanel dark:bg-panel border border-slate-200 dark:border-zinc-700 rounded-lg shadow-xl py-1 z-[100] animate-slide-down overflow-hidden">
                                             {[ { id: 'all', label: '전체' }, { id: 'title', label: '제목' }, { id: 'script', label: '자막' } ].map(opt => (
                                                 <button
                                                     key={opt.id}
@@ -753,19 +792,18 @@
                                     )}
                                 </div>
                                 
-                                <div className="w-px h-4 bg-slate-300 dark:bg-zinc-600 mx-1"></div>
+                                <div className="w-px h-4 bg-slate-300 dark:bg-zinc-600 mx-1 z-20"></div>
 
-                                <Icon name="search" className="w-5 h-5 text-slate-400 dark:text-zinc-400 ml-2" />
                                 <input 
                                     type="text" 
-                                    placeholder="검색" 
-                                    className="flex-1 bg-transparent py-2 px-3 outline-none text-base text-slate-700 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 min-w-0" 
+                                    placeholder="🔍 영상 제목이나 내용을 검색하세요" 
+                                    className="absolute inset-0 w-full h-full bg-transparent py-2 pl-24 pr-10 outline-none text-base text-slate-700 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 rounded-full" 
                                     value={searchQuery} 
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     onFocus={() => { if(searchQuery) setShowSearchResults(true); }}
                                 />
                                 {searchQuery && (
-                                    <button type="button" onClick={() => { setSearchQuery(''); setSearchResults([]); }} className="pr-4 text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300">
+                                    <button type="button" onClick={() => { setSearchQuery(''); setSearchResults([]); }} className="absolute right-3 z-20 text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300">
                                         <Icon name="x" className="w-4 h-4" />
                                     </button>
                                 )}
@@ -777,9 +815,21 @@
                                     {(expandedSearch ? searchResults : searchResults.slice(0, 5)).map(item => (
                                         <button key={item.natural_key} type="button" onClick={() => selectVideo(item)} className="w-full text-left px-4 py-3 hover:bg-slate-100 dark:hover:bg-zinc-700 rounded-lg group transition-colors flex items-center justify-between border-b border-slate-100 dark:border-zinc-700/50 last:border-0">
                                             <div className="flex-1 min-w-0 pr-3">
-                                                <div className="font-medium text-sm text-slate-700 dark:text-zinc-200 group-hover:text-blue-500 dark:group-hover:text-blue-400 truncate">
-                                                    <HighlightText text={item.title} highlight={searchQuery} />
+                                                <div className="font-medium text-sm text-slate-700 dark:text-zinc-200 group-hover:text-blue-500 dark:group-hover:text-blue-400 truncate flex items-center">
+                                                    <span className="truncate">
+                                                        <HighlightText text={item.title} highlight={searchQuery} />
+                                                    </span>
+                                                    {item._hitCount > 0 && (
+                                                        <span className="ml-2 text-[10px] text-blue-500 font-bold bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                                                            {item._hitCount}회
+                                                        </span>
+                                                    )}
                                                 </div>
+                                                {searchQuery && !item.title.toLowerCase().includes(searchQuery.toLowerCase()) && item._matchedPreview && (
+                                                    <div className="text-[11px] text-slate-500 dark:text-zinc-500 truncate mt-0.5">
+                                                        Match: <HighlightText text={item._matchedPreview} highlight={searchQuery} />
+                                                    </div>
+                                                )}
                                             </div>
                                             <span className="text-[10px] text-slate-500 dark:text-zinc-500 font-medium px-2 py-1 rounded bg-slate-200 dark:bg-zinc-800 shrink-0">재생</span>
                                         </button>
@@ -962,7 +1012,7 @@
                                                                         onClick={() => setPlaybackSpeed(rate)}
                                                                         className={`text-[11px] font-bold py-2 rounded transition-colors ${playbackSpeed === rate ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-200 dark:hover:bg-zinc-700'}`}
                                                                     >
-                                                                            {rate}
+                                                                                {rate}
                                                                     </button>
                                                                 ))}
                                                             </div>

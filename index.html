@@ -41,8 +41,7 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@500;700&display=swap');
         
-        /* [MODIFIED] Default Text Color Brighter for Dark Mode Contrast */
-        html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; background-color: #121212; color: #d4d4d8; } /* text-zinc-300 */
+        html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; background-color: #121212; color: #d4d4d8; } 
         body { font-family: 'Inter', 'Noto Sans KR', sans-serif; -webkit-font-smoothing: antialiased; }
         
         .font-chinese-serif { font-family: 'Noto Serif SC', serif; }
@@ -63,7 +62,6 @@
         @keyframes slide-up { from { transform: translate(-50%, 20px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
         .toast-enter { animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
-        /* Highlight Style */
         mark.highlight { background-color: rgba(234, 179, 8, 0.5); color: white; border-radius: 2px; padding: 0 2px; font-weight: bold; }
     </style>
 </head>
@@ -101,17 +99,20 @@
             return result;
         };
 
+        // [MODIFIED] Robust Logic: Merge Significant Overlaps (No Omission)
         const getMatchingContent = (targetScript, startTime, endTime) => {
             if (!targetScript || targetScript.length === 0) return null;
             
             const safeEndTime = endTime || (startTime + 5);
             
+            // 1. Find ALL candidates that overlap the time window
             const candidates = targetScript.filter(t => {
                 const tEnd = t.end || (t.start + 5); 
-                return (t.start < safeEndTime - 0.1) && (tEnd > startTime + 0.1);
+                return (t.start < safeEndTime) && (tEnd > startTime);
             });
 
             if (candidates.length === 0) {
+                // Fallback: Nearest start time
                 const idx = findIndexByTime(targetScript, startTime);
                 if (idx !== -1) {
                     const candidate = targetScript[idx];
@@ -122,21 +123,34 @@
                 return null;
             }
 
-            const scoredCandidates = candidates.map(c => {
+            // 2. Filter out "noise" (insignificant overlaps)
+            // But KEEP multiple sentences if they all overlap significantly (e.g. > 0.2s)
+            // This ensures we don't omit consecutive short sentences.
+            const meaningfulCandidates = candidates.filter(c => {
                 const cEnd = c.end || (c.start + 5);
                 const overlapStart = Math.max(startTime, c.start);
                 const overlapEnd = Math.min(safeEndTime, cEnd);
                 const overlapDuration = Math.max(0, overlapEnd - overlapStart);
-                return { ...c, score: overlapDuration };
+                
+                // Threshold: Keep if overlap is > 0.2s. 
+                // This filters out timing glitches where previous sentence ends 0.01s into current window.
+                return overlapDuration > 0.2; 
             });
 
-            scoredCandidates.sort((a, b) => b.score - a.score);
-            const bestMatch = scoredCandidates[0];
+            // If strict filtering removed everything, fall back to all candidates (safety net)
+            const finalCandidates = meaningfulCandidates.length > 0 ? meaningfulCandidates : candidates;
+
+            // 3. Sort by start time to maintain reading order
+            finalCandidates.sort((a, b) => a.start - b.start);
+
+            // 4. Combine text (Merge Strategy)
+            const combinedText = finalCandidates.map(c => c.text).join(' ');
+            const combinedPinyin = finalCandidates.map(c => c.pinyin || '').join(' ');
 
             return { 
-                text: bestMatch.text, 
-                pinyin: bestMatch.pinyin || null,
-                start: bestMatch.start 
+                text: combinedText, 
+                pinyin: combinedPinyin.trim() ? combinedPinyin : null,
+                start: finalCandidates[0].start 
             };
         };
 
@@ -166,8 +180,8 @@
                 play: <path d="m5 3 14 9-14 9V3z" />,
                 pause: <path d="M6 4h4v16H6zm8 0h4v16h-4z" />,
                 search: <React.Fragment><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></React.Fragment>,
-                // [MODIFIED] New Gear Icon (YouTube Style - Solid)
-                settings: <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0-8a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm6.34 2.86l-1.35.8c.27 1.05.27 2.16 0 3.22l1.35.8c1.3-2.22 1.3-4.6 0-6.82zm-3.08-3.08l-.8 1.35c-1.05-.27-2.16-.27-3.22 0l-.8-1.35c2.22-1.3 4.6-1.3 6.82 0zm-6.82 0l-.8 1.35a5.53 5.53 0 0 0-3.22 0l-.8-1.35c2.22-1.3 4.6-1.3 6.82 0zm-3.08 3.08l1.35.8c-.27 1.05-.27 2.16 0 3.22l-1.35.8c-1.3-2.22-1.3-4.6 0-6.82zm3.08 6.82l.8-1.35c1.05.27 2.16.27 3.22 0l.8 1.35c-2.22 1.3-4.6 1.3-6.82 0zm6.82 0l.8-1.35c1.05.27 2.16.27 3.22 0l.8 1.35c-2.22 1.3-4.6 1.3-6.82 0z" fillRule="evenodd"/>,
+                // [MODIFIED] Fixed Settings Icon (Solid Gear)
+                settings: <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.04.17 0 .34.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.58 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.04-.22 0-.45-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" />,
                 x: <path d="M18 6 6 18M6 6l12 12"/>,
                 volume: <path d="M11 5L6 9H2v6h4l5 4V5z" />,
                 message: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />,
@@ -212,7 +226,6 @@
                         {new Date(item.start * 1000).toISOString().substr(14, 5)}
                     </div>
 
-                    {/* [MODIFIED] Added cursor-text to indicate selectability */}
                     {koContent && (
                         <div style={{ fontSize: `${fontSizes.ko}px` }} className={`leading-relaxed mb-1.5 transition-colors cursor-text ${baseLang==='ko' && isActive ? 'font-bold text-blue-300' : 'text-zinc-300 group-hover:text-white'}`}>
                             <HighlightText text={koContent.text} highlight={searchQuery} />
@@ -305,7 +318,7 @@
             const [searchResults, setSearchResults] = useState([]);
             const [showSearchResults, setShowSearchResults] = useState(false);
             const [searchScope, setSearchScope] = useState('all'); 
-            const [showScopeMenu, setShowScopeMenu] = useState(false); // [NEW] Scope Menu State
+            const [showScopeMenu, setShowScopeMenu] = useState(false); 
             const [expandedSearch, setExpandedSearch] = useState(false); 
 
             const [selectedItem, setSelectedItem] = useState(null);
@@ -333,7 +346,6 @@
             const [fontSizes, setFontSizes] = useState({ ko: 16, en: 15, cn: 18 });
             const [showPinyin, setShowPinyin] = useState(true);
             const [scriptSearchQuery, setScriptSearchQuery] = useState('');
-            // [DELETED] Removed showDebug state
 
             const videoRef = useRef(null);
             const scriptContainerRef = useRef(null); 
@@ -672,10 +684,10 @@
                         <div className="w-8 shrink-0"></div> 
                     </header>
 
-                    {/* [MODIFIED] Mobile Layout: Flex Column, Desktop: Row */}
+                    {/* [MODIFIED] Mobile Layout: Fixed Height Video, Scrolling Script */}
                     <main className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
-                        {/* LEFT (Desktop) / TOP (Mobile): Video Player (40% desktop, 35vh mobile) */}
-                        <div className="w-full h-[35vh] md:w-[40%] md:h-full flex flex-col min-w-0 bg-black relative group border-b md:border-b-0 md:border-r border-zinc-800">
+                        {/* LEFT (Desktop) / TOP (Mobile): Video Player (Fixed Height on Mobile) */}
+                        <div className="w-full h-[35vh] flex-none md:w-[40%] md:h-full flex flex-col min-w-0 bg-black relative group border-b md:border-b-0 md:border-r border-zinc-800">
                             {!selectedItem ? (
                                 <div className="flex-1 flex flex-col items-center justify-center bg-panel text-zinc-500 gap-4">
                                     <Icon name="play" className="w-16 h-16 opacity-20" />
@@ -709,7 +721,7 @@
                                             </div>
                                         )}
 
-                                        {/* Overlay Subtitles (Improved Sync) */}
+                                        {/* Overlay Subtitles */}
                                         {!selectedItem.isExternal && !videoError && selectedItem.scripts && (
                                             <div className="absolute bottom-6 left-0 right-0 px-4 text-center pointer-events-none flex flex-col items-center gap-2">
                                                 <div className="inline-block bg-black/70 backdrop-blur-md px-6 py-4 rounded-xl shadow-lg max-w-full">
@@ -718,7 +730,7 @@
                                                         {selectedItem.scripts[baseLang]?.[activeIndices.base]?.text}
                                                     </div>
                                                     
-                                                    {/* Using Improved Best-Match Logic */}
+                                                    {/* Using Improved Merge Logic */}
                                                     {Array.from(subtitleModes).map(mode => {
                                                         if (mode === baseLang) return null; 
                                                         
@@ -726,7 +738,7 @@
                                                         if (!baseItem) return null;
                                                         
                                                         const endTime = baseItem.end || (selectedItem.scripts[baseLang][activeIndices.base+1] ? selectedItem.scripts[baseLang][activeIndices.base+1].start : (baseItem.start + 10));
-                                                        // Using the new logic
+                                                        
                                                         const matched = getMatchingContent(selectedItem.scripts[mode], baseItem.start, endTime);
                                                         
                                                         if (!matched) return null;
@@ -845,10 +857,10 @@
                             )}
                         </div>
 
-                        {/* RIGHT (Desktop) / BOTTOM (Mobile): Script Panel (60% desktop, remaining mobile) */}
-                        <div className="w-full flex-1 md:w-[60%] md:h-full border-l-0 md:border-l border-zinc-800 bg-darkbg flex flex-col shadow-xl z-20 shrink-0">
+                        {/* RIGHT (Desktop) / BOTTOM (Mobile): Script Panel (Scrolling) */}
+                        <div className="w-full flex-1 md:w-[60%] md:h-full border-l-0 md:border-l border-zinc-800 bg-darkbg flex flex-col shadow-xl z-20 shrink-0 min-h-0">
                             {/* Script Header */}
-                            <div className="p-4 border-b border-zinc-800 bg-darkbg/95 backdrop-blur-sm space-y-3">
+                            <div className="p-4 border-b border-zinc-800 bg-darkbg/95 backdrop-blur-sm space-y-3 shrink-0">
                                 {selectedItem && !selectedItem.isExternal ? (
                                     <>
                                         <div className="flex items-center justify-between">
@@ -885,20 +897,29 @@
 
                                         {showRightSettings && (
                                             <div className="bg-panel rounded-xl p-4 border border-zinc-700 animate-in slide-in-from-top-2 fade-in mb-2 shadow-lg">
-                                                <div className="flex items-center justify-between mb-4">
+                                                <div className="flex items-center justify-between mb-3">
                                                     <span className="text-xs font-bold text-zinc-400">병음 표시</span>
                                                     <button onClick={() => setShowPinyin(!showPinyin)} className={`text-[11px] font-bold px-3 py-1 rounded border transition-colors ${showPinyin ? 'bg-blue-600 border-blue-600 text-white' : 'border-zinc-600 text-zinc-400'}`}>{showPinyin ? '켜짐' : '꺼짐'}</button>
                                                 </div>
-                                                <div className="space-y-3">
-                                                    {[{id:'ko', name:'한국어'}, {id:'en', name:'영어'}, {id:'cn', name:'중국어'}].map(lang => (
-                                                        <div key={lang.id} className="flex items-center gap-3">
-                                                            <span className="text-[11px] font-bold uppercase w-10 text-zinc-500">{lang.name}</span>
-                                                            <input type="range" min="12" max="28" value={fontSizes[lang.id]} onChange={(e) => setFontSizes({...fontSizes, [lang.id]: Number(e.target.value)})} className="flex-1 h-1.5 bg-zinc-700 rounded-lg appearance-none cursor-pointer" />
-                                                            <span className="text-[11px] w-6 text-right text-zinc-500">{fontSizes[lang.id]}px</span>
+                                                
+                                                {/* [MODIFIED] Compact Font Settings */}
+                                                <div className="space-y-1"> 
+                                                    {[{id:'ko', name:'KR'}, {id:'en', name:'EN'}, {id:'cn', name:'CN'}].map(lang => (
+                                                        <div key={lang.id} className="flex items-center gap-2">
+                                                            <span className="text-[10px] font-bold text-zinc-500 w-6">{lang.name}</span>
+                                                            <input 
+                                                                type="range" 
+                                                                min="12" 
+                                                                max="22" 
+                                                                step="1"
+                                                                value={fontSizes[lang.id]} 
+                                                                onChange={(e) => setFontSizes({...fontSizes, [lang.id]: Number(e.target.value)})} 
+                                                                className="flex-1 h-1 bg-zinc-700 rounded-lg appearance-none cursor-pointer" 
+                                                            />
+                                                            <span className="text-[10px] w-6 text-right text-zinc-500">{fontSizes[lang.id]}</span>
                                                         </div>
                                                     ))}
                                                 </div>
-                                                {/* [DELETED] Debug panel removed */}
                                             </div>
                                         )}
 
@@ -918,10 +939,10 @@
                                 )}
                             </div>
 
-                            {/* Script List */}
+                            {/* Script List: Added select-text for Dragging */}
                             {selectedItem && !selectedItem.isExternal && selectedItem.scripts && (
                                 <div 
-                                    className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-darkbg" 
+                                    className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-darkbg select-text" 
                                     ref={scriptContainerRef}
                                     onMouseUp={() => {
                                         const selection = window.getSelection();
@@ -930,7 +951,6 @@
                                             const range = selection.getRangeAt(0);
                                             const rect = range.getBoundingClientRect();
                                             setSelectedText(text);
-                                            // [MODIFIED] Adjust popup position to stay within screen
                                             setSelectionPos({ x: rect.left + rect.width / 2, y: rect.top });
                                         } else {
                                             setSelectedText('');
@@ -952,7 +972,7 @@
                         </div>
                     </main>
 
-                    {/* [MODIFIED] Dictionary Tooltip with Stop Propagation */}
+                    {/* Dictionary Tooltip */}
                     {selectedText && (
                         <div 
                             className="fixed z-50 bg-zinc-800 shadow-2xl rounded-xl p-2 flex gap-2 border border-zinc-700 animate-in zoom-in-95 duration-200" 

@@ -14,6 +14,8 @@
                     colors: {
                         darkbg: '#121212',
                         panel: '#1e1e1e',
+                        lightbg: '#F1F5F9', /* Eye-comfort Greenish White */
+                        lightpanel: '#F8FAFC',
                         accent: '#3b82f6'
                     },
                     animation: {
@@ -204,6 +206,11 @@
             if(name === 'info') return <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>;
             if(name === 'arrowUp') return <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>;
             if(name === 'arrowDown') return <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>;
+            // [NEW] Sun/Moon Icons for Theme Toggle
+            if(name === 'sun') return <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>;
+            if(name === 'moon') return <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>;
+            // [NEW] Headphone Icon for Audio
+            if(name === 'headphone') return <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>;
 
             const icons = {
                 play: <path d="m5 3 14 9-14 9V3z" />,
@@ -243,18 +250,23 @@
             const renderContent = (lang) => {
                 if (!visibleLangs[lang]) return null;
 
+                // [MODIFIED] Unified Highlight Style for Base Language (All colors behave like Korean)
+                const isBase = baseLang === lang;
+                const highlightClass = isBase && isActive 
+                    ? 'font-bold text-blue-600 dark:text-blue-400' 
+                    : 'text-slate-600 dark:text-zinc-300 group-hover:text-slate-900 dark:group-hover:text-white';
+
                 if (lang === 'ko') {
                     return koContent && (
-                        <div key={lang} style={{ fontSize: `${fontSizes.ko}px` }} className={`leading-relaxed mb-1 transition-colors cursor-text select-text ${baseLang==='ko' && isActive ? 'font-bold text-blue-400' : 'text-zinc-300 group-hover:text-white'}`}>
+                        <div key={lang} style={{ fontSize: `${fontSizes.ko}px` }} className={`leading-relaxed mb-1 transition-colors cursor-text select-text ${highlightClass}`}>
                             <HighlightText text={koContent.text} highlight={searchQuery} />
                         </div>
                     );
                 } else if (lang === 'cn') {
                     return cnContent && (
-                        <div key={lang} className={`leading-relaxed mb-1 cursor-text select-text ${baseLang==='cn' && isActive ? 'font-bold text-zinc-200' : 'text-zinc-400 group-hover:text-zinc-300'}`}>
-                            {/* [MODIFIED] Enhanced Pinyin Display */}
+                        <div key={lang} className={`leading-relaxed mb-1 cursor-text select-text ${highlightClass}`}>
                             {showPinyin && cnContent.pinyin && (
-                                <div style={{ fontSize: `${Math.max(10, fontSizes.cn * 0.7)}px` }} className="text-blue-400/80 mb-0.5 font-light">{cnContent.pinyin}</div>
+                                <div style={{ fontSize: `${Math.max(10, fontSizes.cn * 0.7)}px` }} className="text-blue-500 dark:text-blue-400/80 mb-0.5 font-light">{cnContent.pinyin}</div>
                             )}
                             <div style={{ fontSize: `${fontSizes.cn}px` }} className="font-chinese-serif">
                                 <HighlightText text={cnContent.text} highlight={searchQuery} />
@@ -263,7 +275,7 @@
                     );
                 } else if (lang === 'en') {
                     return enContent && (
-                        <div key={lang} style={{ fontSize: `${fontSizes.en}px` }} className={`italic leading-snug cursor-text select-text ${baseLang==='en' && isActive ? 'font-bold text-zinc-200' : 'text-zinc-400 group-hover:text-zinc-300'}`}>
+                        <div key={lang} style={{ fontSize: `${fontSizes.en}px` }} className={`italic leading-snug cursor-text select-text ${highlightClass}`}>
                             <HighlightText text={enContent.text} highlight={searchQuery} />
                         </div>
                     );
@@ -277,11 +289,11 @@
                     ref={itemRef}
                     className={`mb-2 px-3 py-3 rounded-lg cursor-pointer transition-all duration-200 relative group border-l-4
                         ${isActive 
-                            ? 'bg-zinc-800/80 border-blue-500' 
-                            : 'hover:bg-zinc-800/40 border-transparent'
+                            ? 'bg-green-100 dark:bg-zinc-800/80 border-blue-500' 
+                            : 'hover:bg-green-50 dark:hover:bg-zinc-800/40 border-transparent'
                         }`}
                 >
-                    <div className="absolute top-2 right-2 text-[10px] md:text-xs font-mono text-zinc-500 group-hover:text-zinc-400 transition-colors">
+                    <div className="absolute top-2 right-2 text-[10px] md:text-xs font-mono text-slate-400 dark:text-zinc-500 group-hover:text-slate-600 dark:group-hover:text-zinc-400 transition-colors">
                         {new Date(item.start * 1000).toISOString().substr(14, 5)}
                     </div>
 
@@ -296,7 +308,7 @@
         }) => {
             const baseScript = scripts[baseLang];
             if (!baseScript || baseScript.length === 0) {
-                return <div className="p-10 text-center text-zinc-500 text-sm">선택한 기준 언어의 스크립트가 없습니다.</div>;
+                return <div className="p-10 text-center text-slate-500 dark:text-zinc-500 text-sm">선택한 기준 언어의 스크립트가 없습니다.</div>;
             }
 
             let itemsToRender = baseScript;
@@ -305,10 +317,10 @@
                 itemsToRender = baseScript.filter(item => item.text.toLowerCase().includes(query));
             }
 
-            if (itemsToRender.length === 0) return <div className="p-10 text-center text-zinc-500 text-sm">검색 결과가 없습니다.</div>;
+            if (itemsToRender.length === 0) return <div className="p-10 text-center text-slate-500 dark:text-zinc-500 text-sm">검색 결과가 없습니다.</div>;
 
             return (
-                <div className="flex-1 overflow-y-auto p-2 custom-scrollbar bg-darkbg select-text">
+                <div className="flex-1 overflow-y-auto p-2 custom-scrollbar bg-lightbg dark:bg-darkbg select-text">
                     {itemsToRender.map((item, idx) => {
                         const originalIdx = scripts[baseLang].indexOf(item); 
                         const isActive = activeIndex === originalIdx;
@@ -383,21 +395,35 @@
 
             const [selectedText, setSelectedText] = useState('');
             const [selectionPos, setSelectionPos] = useState({ x: 0, y: 0 });
-            // [MODIFIED] Increased Default Font Size to 18px
+            
             const [fontSizes, setFontSizes] = useState({ ko: 18, en: 16, cn: 20 });
-            const [showPinyin, setShowPinyin] = useState(true);
+            const [showPinyin, setShowPinyin] = useState(true); // Always true, no toggle
             const [scriptSearchQuery, setScriptSearchQuery] = useState('');
 
             // [NEW] Language Order and Visibility States
             const [langOrder, setLangOrder] = useState(['ko', 'en', 'cn']);
             const [visibleLangs, setVisibleLangs] = useState({ ko: true, en: true, cn: true });
+            
+            // [NEW] Theme State
+            const [theme, setTheme] = useState('dark');
 
             const videoRef = useRef(null);
             const scriptContainerRef = useRef(null); 
             const scopeMenuRef = useRef(null);
 
+            // [MODIFIED] Language Labels
             const langLabels = { ko: '한국어', en: '영어', cn: '중국어' };
             const speedOptions = [0.5, 0.75, 0.8, 0.9, 1.0, 1.2, 1.5];
+
+            // Apply Theme
+            useEffect(() => {
+                const root = document.documentElement;
+                if (theme === 'dark') {
+                    root.classList.add('dark');
+                } else {
+                    root.classList.remove('dark');
+                }
+            }, [theme]);
 
             const showToast = (msg) => {
                 setToastMessage(msg);
@@ -568,7 +594,6 @@
                 }
             }, [audioLang, selectedItem]);
 
-            // [MODIFIED] Gap Handling Logic (Active Indices)
             const activeIndices = useMemo(() => {
                 if (!selectedItem || selectedItem.isExternal || !selectedItem.scripts) return { base: -1 };
                 const baseScript = selectedItem.scripts[baseLang];
@@ -576,12 +601,10 @@
                 
                 const baseIdx = findIndexByTime(baseScript, currentTime);
                 
-                // [NEW] Silence Detection: If outside item duration, return -1
                 if (baseIdx !== -1) {
                     const item = baseScript[baseIdx];
                     const nextItem = baseScript[baseIdx + 1];
                     const endTime = item.end || (nextItem ? nextItem.start : item.start + 10);
-                    // Buffer 0.2s allows for slight drift but hides subtitle strictly
                     if (currentTime > endTime + 0.2) {
                         return { base: -1 }; 
                     }
@@ -646,7 +669,6 @@
                 setSubtitleModes(newModes);
             };
 
-            // [NEW] Language Reordering Logic
             const moveLang = (index, direction) => {
                 const newOrder = [...langOrder];
                 if (direction === 'up' && index > 0) {
@@ -661,12 +683,10 @@
                 setVisibleLangs(prev => ({ ...prev, [langId]: !prev[langId] }));
             };
 
-            // [NEW] Auto-scroll to top and reorder when base language changes
             useEffect(() => {
                 if (scriptContainerRef.current) {
                     scriptContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
                 }
-                // Auto-sort base language to top
                 setLangOrder(prev => {
                     const newOrder = [baseLang, ...prev.filter(l => l !== baseLang)];
                     return newOrder;
@@ -674,27 +694,27 @@
             }, [baseLang]);
 
 
-            if (loading) return <div className="flex items-center justify-center h-full bg-darkbg text-zinc-500"><div className="animate-spin rounded-full h-8 w-8 border-2 border-zinc-600 border-t-zinc-200"></div></div>;
-            if (error) return <div className="flex items-center justify-center h-full text-red-400">{error}</div>;
+            if (loading) return <div className="flex items-center justify-center h-full bg-lightbg dark:bg-darkbg text-slate-500 dark:text-zinc-500"><div className="animate-spin rounded-full h-8 w-8 border-2 border-slate-600 dark:border-zinc-600 border-t-slate-200 dark:border-t-zinc-200"></div></div>;
+            if (error) return <div className="flex items-center justify-center h-full text-red-500 dark:text-red-400">{error}</div>;
 
             return (
-                <div className="flex flex-col h-full overflow-hidden select-none bg-darkbg">
+                <div className="flex flex-col h-full overflow-hidden select-none bg-lightbg dark:bg-darkbg transition-colors duration-300">
                     {/* Header */}
-                    <header className="h-16 flex items-center justify-between px-4 shrink-0 border-b border-zinc-800 bg-darkbg/90 backdrop-blur-md z-30 gap-4">
+                    <header className="h-16 flex items-center justify-between px-4 shrink-0 border-b border-slate-200 dark:border-zinc-800 bg-lightbg/90 dark:bg-darkbg/90 backdrop-blur-md z-30 gap-4">
                         <div className="flex items-center gap-2 cursor-pointer shrink-0" onClick={() => { setSelectedItem(null); setIsPlaying(false); }}>
                             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-lg">J</div>
-                            <span className="font-bold text-base tracking-tight hidden sm:block text-zinc-200">Language Player</span>
+                            <span className="font-bold text-base tracking-tight hidden sm:block text-slate-700 dark:text-zinc-200">Language Player</span>
                         </div>
                         
                         {/* Mobile-Friendly Search Bar */}
                         <form onSubmit={handleSearchSubmit} className="flex-1 max-w-2xl mx-auto relative group">
-                            <div className="relative flex items-center bg-panel rounded-full border border-zinc-600 focus-within:border-blue-500 transition-colors h-11 shadow-lg w-full">
+                            <div className="relative flex items-center bg-lightpanel dark:bg-panel rounded-full border border-slate-300 dark:border-zinc-600 focus-within:border-blue-500 transition-colors h-11 shadow-sm dark:shadow-lg w-full">
                                 
                                 <div className="relative" ref={scopeMenuRef}>
                                     <button 
                                         type="button" 
                                         onClick={() => setShowScopeMenu(!showScopeMenu)}
-                                        className="flex items-center gap-1.5 px-3 h-full text-xs font-bold text-zinc-300 hover:text-white transition-colors whitespace-nowrap"
+                                        className="flex items-center gap-1.5 px-3 h-full text-xs font-bold text-slate-600 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-white transition-colors whitespace-nowrap"
                                     >
                                         <span>
                                             {searchScope === 'all' ? '전체' : 
@@ -704,13 +724,13 @@
                                     </button>
                                     
                                     {showScopeMenu && (
-                                        <div className="absolute top-full left-0 mt-2 w-24 bg-panel border border-zinc-700 rounded-lg shadow-xl py-1 z-50 animate-slide-down overflow-hidden">
+                                        <div className="absolute top-full left-0 mt-2 w-24 bg-lightpanel dark:bg-panel border border-slate-200 dark:border-zinc-700 rounded-lg shadow-xl py-1 z-50 animate-slide-down overflow-hidden">
                                             {[ { id: 'all', label: '전체' }, { id: 'title', label: '제목' }, { id: 'script', label: '자막' } ].map(opt => (
                                                 <button
                                                     key={opt.id}
                                                     type="button"
                                                     onClick={() => { setSearchScope(opt.id); setShowScopeMenu(false); }}
-                                                    className={`w-full text-left px-3 py-2 text-xs font-medium hover:bg-zinc-700 transition-colors ${searchScope === opt.id ? 'text-blue-400 bg-zinc-800' : 'text-zinc-300'}`}
+                                                    className={`w-full text-left px-3 py-2 text-xs font-medium hover:bg-slate-100 dark:hover:bg-zinc-700 transition-colors ${searchScope === opt.id ? 'text-blue-500 bg-slate-50 dark:bg-zinc-800' : 'text-slate-700 dark:text-zinc-300'}`}
                                                 >
                                                     {opt.label}
                                                 </button>
@@ -719,42 +739,42 @@
                                     )}
                                 </div>
                                 
-                                <div className="w-px h-4 bg-zinc-600 mx-1"></div>
+                                <div className="w-px h-4 bg-slate-300 dark:bg-zinc-600 mx-1"></div>
 
-                                <Icon name="search" className="w-5 h-5 text-zinc-400 ml-2" />
+                                <Icon name="search" className="w-5 h-5 text-slate-400 dark:text-zinc-400 ml-2" />
                                 <input 
                                     type="text" 
                                     placeholder="검색" 
-                                    className="flex-1 bg-transparent py-2 px-3 outline-none text-base text-zinc-200 placeholder-zinc-500 min-w-0" 
+                                    className="flex-1 bg-transparent py-2 px-3 outline-none text-base text-slate-700 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 min-w-0" 
                                     value={searchQuery} 
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     onFocus={() => { if(searchQuery) setShowSearchResults(true); }}
                                 />
                                 {searchQuery && (
-                                    <button type="button" onClick={() => { setSearchQuery(''); setSearchResults([]); }} className="pr-4 text-zinc-500 hover:text-zinc-300">
+                                    <button type="button" onClick={() => { setSearchQuery(''); setSearchResults([]); }} className="pr-4 text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300">
                                         <Icon name="x" className="w-4 h-4" />
                                     </button>
                                 )}
                             </div>
                             
-                            {/* Search Results (Mobile: limit height) */}
+                            {/* Search Results */}
                             {showSearchResults && searchResults.length > 0 && (
-                                <div className="absolute top-full left-0 right-0 mt-2 bg-panel rounded-xl shadow-2xl border border-zinc-700 max-h-[60vh] overflow-y-auto custom-scrollbar z-50 p-2 max-w-[95vw] mx-auto">
+                                <div className="absolute top-full left-0 right-0 mt-2 bg-lightpanel dark:bg-panel rounded-xl shadow-2xl border border-slate-200 dark:border-zinc-700 max-h-[60vh] overflow-y-auto custom-scrollbar z-50 p-2 max-w-[95vw] mx-auto">
                                     {(expandedSearch ? searchResults : searchResults.slice(0, 5)).map(item => (
-                                        <button key={item.natural_key} type="button" onClick={() => selectVideo(item)} className="w-full text-left px-4 py-3 hover:bg-zinc-700 rounded-lg group transition-colors flex items-center justify-between border-b border-zinc-700/50 last:border-0">
+                                        <button key={item.natural_key} type="button" onClick={() => selectVideo(item)} className="w-full text-left px-4 py-3 hover:bg-slate-100 dark:hover:bg-zinc-700 rounded-lg group transition-colors flex items-center justify-between border-b border-slate-100 dark:border-zinc-700/50 last:border-0">
                                             <div className="flex-1 min-w-0 pr-3">
-                                                <div className="font-medium text-sm text-zinc-200 group-hover:text-blue-400 truncate">
+                                                <div className="font-medium text-sm text-slate-700 dark:text-zinc-200 group-hover:text-blue-500 dark:group-hover:text-blue-400 truncate">
                                                     <HighlightText text={item.title} highlight={searchQuery} />
                                                 </div>
                                             </div>
-                                            <span className="text-[10px] text-zinc-500 font-medium px-2 py-1 rounded bg-zinc-800 shrink-0">재생</span>
+                                            <span className="text-[10px] text-slate-500 dark:text-zinc-500 font-medium px-2 py-1 rounded bg-slate-200 dark:bg-zinc-800 shrink-0">재생</span>
                                         </button>
                                     ))}
                                     {searchResults.length > 5 && !expandedSearch && (
                                         <button 
                                             type="button" 
                                             onClick={() => setExpandedSearch(true)}
-                                            className="w-full text-center py-2.5 text-xs font-bold text-blue-400 hover:text-blue-300 hover:bg-zinc-700 rounded-lg mt-1"
+                                            className="w-full text-center py-2.5 text-xs font-bold text-blue-500 dark:text-blue-400 hover:text-blue-600 dark:hover:text-blue-300 hover:bg-slate-100 dark:hover:bg-zinc-700 rounded-lg mt-1"
                                         >
                                             더보기 ({searchResults.length - 5}개 더 있음)
                                         </button>
@@ -763,17 +783,23 @@
                             )}
                         </form>
                         
-                        <div className="w-0 sm:w-8 shrink-0"></div> 
+                        {/* [NEW] Theme Toggle Button */}
+                        <button 
+                            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                            className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-400 transition-colors shrink-0"
+                        >
+                            <Icon name={theme === 'dark' ? 'sun' : 'moon'} className="w-5 h-5" />
+                        </button>
                     </header>
 
                     {/* Mobile Layout */}
                     <main className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
                         {/* Video Player */}
-                        <div className="w-full h-[35vh] flex-none md:w-[40%] md:h-full flex flex-col min-w-0 bg-black relative group border-b md:border-b-0 md:border-r border-zinc-800">
+                        <div className="w-full h-[35vh] flex-none md:w-[40%] md:h-full flex flex-col min-w-0 bg-black relative group border-b md:border-b-0 md:border-r border-slate-300 dark:border-zinc-800">
                             {!selectedItem ? (
-                                <div className="flex-1 flex flex-col items-center justify-center bg-panel text-zinc-500 gap-4">
+                                <div className="flex-1 flex flex-col items-center justify-center bg-slate-50 dark:bg-panel text-slate-400 dark:text-zinc-500 gap-4">
                                     <Icon name="play" className="w-16 h-16 opacity-20" />
-                                    <p className="text-base font-medium text-zinc-400">영상을 선택해주세요</p>
+                                    <p className="text-base font-medium text-slate-500 dark:text-zinc-400">영상을 선택해주세요</p>
                                 </div>
                             ) : (
                                 <>
@@ -803,7 +829,7 @@
                                             </div>
                                         )}
 
-                                        {/* Overlay Subtitles: Hide if activeIndices.base is -1 */}
+                                        {/* Overlay Subtitles */}
                                         {!selectedItem.isExternal && !videoError && selectedItem.scripts && activeIndices.base !== -1 && (
                                             <div className="absolute bottom-6 left-0 right-0 px-4 text-center pointer-events-none flex flex-col items-center gap-2">
                                                 <div className="inline-block bg-black/70 backdrop-blur-md px-6 py-4 rounded-xl shadow-lg max-w-full">
@@ -827,7 +853,7 @@
 
                                                         return (
                                                             <div key={mode} className={`text-zinc-200 text-lg mt-2 font-medium border-t border-white/10 pt-2 ${mode === 'cn' ? 'font-chinese-serif' : ''}`}>
-                                                                    {/* [MODIFIED] Overlay Pinyin Support */}
+                                                                    {/* Overlay Pinyin Support */}
                                                                     {mode === 'cn' && showPinyin && matched.pinyin && (
                                                                         <div className="text-sm text-blue-300 mb-1">{matched.pinyin}</div>
                                                                     )}
@@ -856,21 +882,28 @@
                                     </div>
 
                                     {/* CONTROLS */}
-                                    <div className="bg-panel border-t border-zinc-800 p-4 shrink-0 z-20">
-                                        <div className="flex items-center gap-4 text-xs font-mono font-medium text-zinc-400 mb-3">
+                                    <div className="bg-lightpanel dark:bg-panel border-t border-slate-200 dark:border-zinc-800 p-4 shrink-0 z-20">
+                                        <div className="flex items-center gap-4 text-xs font-mono font-medium text-slate-500 dark:text-zinc-400 mb-3">
                                             <span>{new Date(currentTime * 1000).toISOString().substr(14, 5)}</span>
-                                            <input type="range" min="0" max={duration || 100} value={currentTime} onChange={(e) => { const t = parseFloat(e.target.value); if(videoRef.current) videoRef.current.currentTime = t; setCurrentTime(t); }} className="flex-1 h-1.5 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-blue-500" style={{ backgroundSize: `${(currentTime/duration)*100}% 100%` }} />
+                                            <input type="range" min="0" max={duration || 100} value={currentTime} onChange={(e) => { const t = parseFloat(e.target.value); if(videoRef.current) videoRef.current.currentTime = t; setCurrentTime(t); }} className="flex-1 h-1.5 bg-slate-300 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-blue-500" style={{ backgroundSize: `${(currentTime/duration)*100}% 100%` }} />
                                             <span>{new Date((duration || 0) * 1000).toISOString().substr(14, 5)}</span>
                                         </div>
 
                                         <div className="flex flex-wrap items-center justify-between gap-3">
                                             {!selectedItem.isExternal && (
-                                                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-                                                    {[{ id: 'ko', label: 'KR' }, { id: 'en', label: 'EN' }, { id: 'cn', label: 'CN' }].map(l => (
+                                                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+                                                    {/* [NEW] Audio Icon Label */}
+                                                    <div className="flex items-center gap-1 text-slate-500 dark:text-zinc-500">
+                                                        <Icon name="headphone" className="w-4 h-4" />
+                                                        <span className="text-[10px] font-bold">음성</span>
+                                                    </div>
+                                                    <div className="h-4 w-px bg-slate-300 dark:bg-zinc-700 mx-1"></div>
+                                                    {/* [MODIFIED] Language Buttons */}
+                                                    {[{ id: 'ko', label: '한국어' }, { id: 'en', label: '영어' }, { id: 'cn', label: '중국어' }].map(l => (
                                                         <button 
                                                             key={l.id} 
                                                             onClick={() => setAudioLang(l.id)} 
-                                                            className={`px-3 py-1.5 text-xs font-bold rounded transition-all whitespace-nowrap ${audioLang === l.id ? 'bg-zinc-200 text-black' : 'text-zinc-500 hover:text-zinc-300 bg-zinc-800'}`}
+                                                            className={`px-3 py-1.5 text-xs font-bold rounded transition-all whitespace-nowrap ${audioLang === l.id ? 'bg-slate-200 dark:bg-zinc-200 text-slate-900 dark:text-black' : 'text-slate-500 dark:text-zinc-500 hover:text-slate-800 dark:hover:text-zinc-300 bg-slate-100 dark:bg-zinc-800'}`}
                                                         >
                                                                 {l.label}
                                                         </button>
@@ -881,7 +914,7 @@
                                             <div className="flex items-center justify-center flex-1">
                                                  <button 
                                                     onClick={() => setLoopMode(!loopMode)} 
-                                                    className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${loopMode ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}
+                                                    className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${loopMode ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'bg-slate-200 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-300 dark:hover:bg-zinc-700'}`}
                                                 >
                                                     <Icon name="repeat" className="w-4 h-4" />
                                                     <span className="text-xs font-bold">{loopMode ? '루프 On' : '루프 Off'}</span>
@@ -891,23 +924,22 @@
                                             <div className="relative">
                                                 <button 
                                                     onClick={() => setShowPlayerSettings(!showPlayerSettings)} 
-                                                    className={`p-2.5 rounded-full transition-colors flex items-center gap-1.5 ${showPlayerSettings ? 'bg-zinc-800 text-blue-400' : 'text-zinc-400 hover:text-zinc-200'}`}
+                                                    className={`p-2.5 rounded-full transition-colors flex items-center gap-1.5 ${showPlayerSettings ? 'bg-slate-200 dark:bg-zinc-800 text-blue-500 dark:text-blue-400' : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'}`}
                                                 >
                                                     <span className="text-xs font-bold">{playbackSpeed}x</span>
                                                     <Icon name="settings" className="w-5 h-5" />
                                                 </button>
 
-                                                {/* Mobile-Friendly Settings Popup */}
                                                 {showPlayerSettings && (
-                                                    <div className="absolute bottom-full right-0 mb-4 bg-panel border border-zinc-700 rounded-xl shadow-2xl p-5 w-60 popup-enter z-50 max-w-[90vw]">
+                                                    <div className="absolute bottom-full right-0 mb-4 bg-lightpanel dark:bg-panel border border-slate-200 dark:border-zinc-700 rounded-xl shadow-2xl p-5 w-60 popup-enter z-50 max-w-[90vw]">
                                                         <div className="mb-5">
-                                                            <div className="text-[11px] font-bold text-zinc-500 uppercase px-1 mb-2">배속</div>
+                                                            <div className="text-[11px] font-bold text-slate-500 dark:text-zinc-500 uppercase px-1 mb-2">배속</div>
                                                             <div className="grid grid-cols-4 gap-1.5">
                                                                 {speedOptions.map(rate => (
                                                                     <button 
                                                                         key={rate} 
                                                                         onClick={() => setPlaybackSpeed(rate)}
-                                                                        className={`text-[11px] font-bold py-2 rounded transition-colors ${playbackSpeed === rate ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}
+                                                                        className={`text-[11px] font-bold py-2 rounded transition-colors ${playbackSpeed === rate ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-200 dark:hover:bg-zinc-700'}`}
                                                                     >
                                                                             {rate}
                                                                     </button>
@@ -917,7 +949,7 @@
 
                                                         {!selectedItem.isExternal && (
                                                             <div>
-                                                                <div className="text-[11px] font-bold text-zinc-500 uppercase px-1 mb-2">자막 모드 (다중 선택)</div>
+                                                                <div className="text-[11px] font-bold text-slate-500 dark:text-zinc-500 uppercase px-1 mb-2">자막 모드 (다중 선택)</div>
                                                                 <div className="flex flex-col gap-1.5">
                                                                     {[{ id: 'ko', label: '한국어' }, { id: 'en', label: '영어' }, { id: 'cn', label: '중국어' }].map(l => {
                                                                         const isActive = subtitleModes.has(l.id);
@@ -925,7 +957,7 @@
                                                                             <button 
                                                                                 key={l.id} 
                                                                                 onClick={() => toggleSubtitleMode(l.id)} 
-                                                                                className={`flex items-center justify-between px-3 py-2 text-xs font-bold rounded transition-all ${isActive ? 'bg-zinc-700 text-blue-400' : 'text-zinc-500 hover:bg-zinc-800'}`}
+                                                                                className={`flex items-center justify-between px-3 py-2 text-xs font-bold rounded transition-all ${isActive ? 'bg-slate-200 dark:bg-zinc-700 text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-zinc-500 hover:bg-slate-100 dark:hover:bg-zinc-800'}`}
                                                                             >
                                                                                 <span>{l.label}</span>
                                                                                 {isActive && <Icon name="check" className="w-3.5 h-3.5" />}
@@ -945,18 +977,19 @@
                         </div>
 
                         {/* Script Panel */}
-                        <div className="w-full flex-1 md:w-[60%] md:h-full border-l-0 md:border-l border-zinc-800 bg-darkbg flex flex-col shadow-xl z-20 shrink-0 min-h-0">
+                        <div className="w-full flex-1 md:w-[60%] md:h-full border-l-0 md:border-l border-slate-200 dark:border-zinc-800 bg-lightbg dark:bg-darkbg flex flex-col shadow-xl z-20 shrink-0 min-h-0">
                             {/* Script Header */}
-                            <div className="p-4 border-b border-zinc-800 bg-darkbg/95 backdrop-blur-sm space-y-3 shrink-0">
+                            <div className="p-4 border-b border-slate-200 dark:border-zinc-800 bg-lightbg/95 dark:bg-darkbg/95 backdrop-blur-sm space-y-3 shrink-0">
                                 {selectedItem && !selectedItem.isExternal ? (
                                     <>
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-3">
-                                                <span className="text-[11px] font-bold text-zinc-500 uppercase flex items-center gap-1.5" title="언어별 어순이 다릅니다. 학습 기준 언어를 선택하세요.">
+                                                <span className="text-[11px] font-bold text-slate-500 dark:text-zinc-500 uppercase flex items-center gap-1.5" title="언어별 어순이 다릅니다. 학습 기준 언어를 선택하세요.">
                                                     <Icon name="list" className="w-3.5 h-3.5" /> 기준 언어
-                                                    <button onClick={() => showToast("언어별 어순이 다릅니다. 학습 기준 언어를 선택하세요.")} className="md:hidden ml-1 text-zinc-600"><Icon name="info" className="w-3 h-3" /></button>
+                                                    <button onClick={() => showToast("언어별 어순이 다릅니다. 학습 기준 언어를 선택하세요.")} className="md:hidden ml-1 text-slate-600 dark:text-zinc-600"><Icon name="info" className="w-3 h-3" /></button>
                                                 </span>
-                                                <div className="flex bg-zinc-900 rounded-lg p-0.5">
+                                                <div className="flex bg-slate-200 dark:bg-zinc-900 rounded-lg p-0.5">
+                                                    {/* [MODIFIED] Language Labels */}
                                                     {[{ id: 'ko', label: '한국어' }, { id: 'en', label: '영어' }, { id: 'cn', label: '중국어' }].map(l => (
                                                         <button 
                                                             key={l.id} 
@@ -964,7 +997,7 @@
                                                                 setBaseLang(l.id); 
                                                                 setSubtitleModes(new Set([l.id === 'ko' ? 'en' : 'ko']));
                                                             }} 
-                                                            className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${baseLang === l.id ? 'bg-zinc-700 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                                            className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${baseLang === l.id ? 'bg-slate-600 dark:bg-zinc-700 text-white shadow-sm' : 'text-slate-500 dark:text-zinc-500 hover:text-slate-800 dark:hover:text-zinc-300'}`}
                                                         >
                                                                 {l.label}
                                                         </button>
@@ -975,27 +1008,24 @@
                                             <div className="flex items-center gap-2">
                                                 <button 
                                                     onClick={() => setAutoScroll(!autoScroll)}
-                                                    className={`px-3 py-1.5 rounded-md text-[11px] font-bold border transition-colors ${autoScroll ? 'border-blue-500/50 text-blue-400 bg-blue-500/10' : 'border-zinc-700 text-zinc-500'}`}
+                                                    className={`px-3 py-1.5 rounded-md text-[11px] font-bold border transition-colors ${autoScroll ? 'border-blue-500/50 text-blue-500 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10' : 'border-slate-300 dark:border-zinc-700 text-slate-500 dark:text-zinc-500'}`}
                                                 >
                                                     {autoScroll ? 'On' : 'Off'}
                                                 </button>
-                                                <button onClick={() => setShowRightSettings(!showRightSettings)} className={`p-2 rounded-lg transition-colors ${showRightSettings ? 'bg-zinc-800 text-blue-400' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                                                <button onClick={() => setShowRightSettings(!showRightSettings)} className={`p-2 rounded-lg transition-colors ${showRightSettings ? 'bg-slate-200 dark:bg-zinc-800 text-blue-500 dark:text-blue-400' : 'text-slate-500 dark:text-zinc-500 hover:text-slate-800 dark:hover:text-zinc-300'}`}>
                                                     <Icon name="settings" className="w-4 h-4" />
                                                 </button>
                                             </div>
                                         </div>
 
                                         {showRightSettings && (
-                                            <div className="bg-panel rounded-xl p-4 border border-zinc-700 animate-in slide-in-from-top-2 fade-in mb-2 shadow-lg max-w-[90vw]">
-                                                <div className="flex items-center justify-between mb-3">
-                                                    <span className="text-xs font-bold text-zinc-400">병음 표시</span>
-                                                    <button onClick={() => setShowPinyin(!showPinyin)} className={`text-[11px] font-bold px-3 py-1 rounded border transition-colors ${showPinyin ? 'bg-blue-600 border-blue-600 text-white' : 'border-zinc-600 text-zinc-400'}`}>{showPinyin ? '켜짐' : '꺼짐'}</button>
-                                                </div>
+                                            <div className="bg-lightpanel dark:bg-panel rounded-xl p-4 border border-slate-200 dark:border-zinc-700 animate-in slide-in-from-top-2 fade-in mb-2 shadow-lg max-w-[90vw]">
+                                                {/* [MODIFIED] Removed Pinyin Toggle (Always On) */}
                                                 
-                                                <div className="space-y-1 border-b border-zinc-700 pb-3 mb-3"> 
+                                                <div className="space-y-1 border-b border-slate-200 dark:border-zinc-700 pb-3 mb-3"> 
                                                     {[{id:'ko', name:'KR'}, {id:'en', name:'EN'}, {id:'cn', name:'CN'}].map(lang => (
                                                         <div key={lang.id} className="flex items-center gap-2">
-                                                            <span className="text-[10px] font-bold text-zinc-500 w-6">{lang.name}</span>
+                                                            <span className="text-[10px] font-bold text-slate-500 dark:text-zinc-500 w-6">{lang.name}</span>
                                                             <input 
                                                                 type="range" 
                                                                 min="12" 
@@ -1003,27 +1033,27 @@
                                                                 step="1"
                                                                 value={fontSizes[lang.id]} 
                                                                 onChange={(e) => setFontSizes({...fontSizes, [lang.id]: Number(e.target.value)})} 
-                                                                className="flex-1 h-1 bg-zinc-700 rounded-lg appearance-none cursor-pointer" 
+                                                                className="flex-1 h-1 bg-slate-300 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer" 
                                                             />
-                                                            <span className="text-[10px] w-6 text-right text-zinc-500">{fontSizes[lang.id]}</span>
+                                                            <span className="text-[10px] w-6 text-right text-slate-500 dark:text-zinc-500">{fontSizes[lang.id]}</span>
                                                         </div>
                                                     ))}
                                                 </div>
 
-                                                {/* [NEW] Language Order & Visibility UI */}
+                                                {/* Language Order & Visibility UI */}
                                                 <div>
-                                                    <div className="text-[10px] font-bold text-zinc-500 uppercase mb-2">언어 순서 및 표시</div>
+                                                    <div className="text-[10px] font-bold text-slate-500 dark:text-zinc-500 uppercase mb-2">언어 순서 및 표시</div>
                                                     <div className="space-y-1">
                                                         {langOrder.map((langId, idx) => (
-                                                            <div key={langId} className="flex items-center justify-between bg-zinc-800 rounded px-2 py-1">
-                                                                <span className="text-xs font-bold text-zinc-300 uppercase">{langId}</span>
+                                                            <div key={langId} className="flex items-center justify-between bg-slate-100 dark:bg-zinc-800 rounded px-2 py-1">
+                                                                <span className="text-xs font-bold text-slate-700 dark:text-zinc-300 uppercase">{langId}</span>
                                                                 <div className="flex items-center gap-1">
-                                                                    <button onClick={() => toggleLangVisibility(langId)} className={`text-[9px] px-1.5 py-0.5 rounded ${visibleLangs[langId] ? 'bg-blue-500/20 text-blue-400' : 'bg-zinc-700 text-zinc-500'}`}>
+                                                                    <button onClick={() => toggleLangVisibility(langId)} className={`text-[9px] px-1.5 py-0.5 rounded ${visibleLangs[langId] ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400' : 'bg-slate-200 dark:bg-zinc-700 text-slate-500 dark:text-zinc-500'}`}>
                                                                         {visibleLangs[langId] ? 'On' : 'Off'}
                                                                     </button>
                                                                     <div className="flex flex-col">
-                                                                        <button disabled={idx===0} onClick={() => moveLang(idx, 'up')} className="hover:text-white disabled:opacity-30"><Icon name="arrowUp" className="w-3 h-3" /></button>
-                                                                        <button disabled={idx===langOrder.length-1} onClick={() => moveLang(idx, 'down')} className="hover:text-white disabled:opacity-30"><Icon name="arrowDown" className="w-3 h-3" /></button>
+                                                                        <button disabled={idx===0} onClick={() => moveLang(idx, 'up')} className="text-slate-400 dark:text-zinc-400 hover:text-slate-700 dark:hover:text-white disabled:opacity-30"><Icon name="arrowUp" className="w-3 h-3" /></button>
+                                                                        <button disabled={idx===langOrder.length-1} onClick={() => moveLang(idx, 'down')} className="text-slate-400 dark:text-zinc-400 hover:text-slate-700 dark:hover:text-white disabled:opacity-30"><Icon name="arrowDown" className="w-3 h-3" /></button>
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -1034,25 +1064,25 @@
                                         )}
 
                                         <div className="relative">
-                                            <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                                            <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-zinc-500" />
                                             <input 
                                                 type="text" 
                                                 placeholder="현재 스크립트 내 검색..." 
-                                                className="w-full bg-zinc-900 border border-transparent focus:border-blue-500 rounded-lg py-2.5 pl-10 pr-3 text-sm outline-none transition-all placeholder:text-zinc-600 text-zinc-300"
+                                                className="w-full bg-slate-100 dark:bg-zinc-900 border border-transparent focus:border-blue-500 rounded-lg py-2.5 pl-10 pr-3 text-sm outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-zinc-600 text-slate-700 dark:text-zinc-300"
                                                 value={scriptSearchQuery}
                                                 onChange={(e) => setScriptSearchQuery(e.target.value)}
                                             />
                                         </div>
                                     </>
                                 ) : (
-                                    <div className="text-center py-6 text-zinc-500 font-medium text-sm">스크립트 없음</div>
+                                    <div className="text-center py-6 text-slate-500 dark:text-zinc-500 font-medium text-sm">스크립트 없음</div>
                                 )}
                             </div>
 
                             {/* Script List */}
                             {selectedItem && !selectedItem.isExternal && selectedItem.scripts && (
                                 <div 
-                                    className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-darkbg select-text" 
+                                    className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-lightbg dark:bg-darkbg select-text" 
                                     ref={scriptContainerRef}
                                     onMouseUp={() => {
                                         const selection = window.getSelection();
@@ -1090,7 +1120,7 @@
                     {/* Dictionary Tooltip with Daum */}
                     {selectedText && (
                         <div 
-                            className="fixed z-50 bg-zinc-800 shadow-2xl rounded-xl p-2 flex gap-2 border border-zinc-700 animate-in zoom-in-95 duration-200" 
+                            className="fixed z-50 bg-white dark:bg-zinc-800 shadow-2xl rounded-xl p-2 flex gap-2 border border-slate-200 dark:border-zinc-700 animate-in zoom-in-95 duration-200" 
                             style={{ left: Math.min(window.innerWidth - 240, Math.max(10, selectionPos.x - 100)), top: selectionPos.y - 60 }}
                             onMouseUp={(e) => e.stopPropagation()} 
                             onMouseDown={(e) => e.stopPropagation()}
@@ -1102,8 +1132,8 @@
                     )}
 
                     {/* Footer */}
-                    <footer className="p-4 text-center text-zinc-500 text-[10px] md:text-xs border-t border-zinc-800 bg-darkbg shrink-0 safe-pb">
-                        문의하기: <a href="mailto:maybenewmail@gmail.com" className="hover:text-zinc-300 underline">maybenewmail@gmail.com</a>
+                    <footer className="p-4 text-center text-slate-500 dark:text-zinc-500 text-[10px] md:text-xs border-t border-slate-200 dark:border-zinc-800 bg-lightbg dark:bg-darkbg shrink-0 safe-pb">
+                        문의하기: <a href="mailto:maybenewmail@gmail.com" className="hover:text-slate-700 dark:hover:text-zinc-300 underline">maybenewmail@gmail.com</a>
                     </footer>
                 </div>
             );

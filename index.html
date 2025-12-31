@@ -103,6 +103,7 @@
             while (left <= right) {
                 const mid = Math.floor((left + right) / 2);
                 const item = script[mid];
+                // Conservative endTime guess for search
                 const endTime = item.end || (script[mid+1] ? script[mid+1].start : item.start + 10);
 
                 if (time >= item.start && time < endTime) {
@@ -119,14 +120,17 @@
             return result;
         };
 
+        // Gap-Aware Smart Merge Logic
         const getMatchingContent = (targetScript, startTime, endTime) => {
             if (!targetScript || targetScript.length === 0) return null;
             
+            // Allow a small buffer for timing mismatches
             const buffer = 0.2; 
             const windowStart = startTime - buffer;
             const windowEnd = (endTime || (startTime + 5)) + buffer; 
             const windowDuration = windowEnd - windowStart;
 
+            // 1. Find candidates strictly within window
             const candidates = targetScript.filter(t => {
                 const tEnd = t.end || (t.start + 2); 
                 const overlapStart = Math.max(windowStart, t.start);
@@ -134,10 +138,12 @@
                 const overlapDuration = Math.max(0, overlapEnd - overlapStart);
                 
                 const tDuration = tEnd - t.start;
+                // Basic overlap check
                 return overlapDuration > 0.2 && (overlapDuration / tDuration > 0.4 || overlapDuration / windowDuration > 0.3);
             });
 
             if (candidates.length === 0) {
+                // Fallback logic
                 const idx = findIndexByTime(targetScript, startTime + 0.1);
                 if (idx !== -1) {
                     const candidate = targetScript[idx];
@@ -148,8 +154,10 @@
                 return null;
             }
 
+            // 2. Sort by start time
             candidates.sort((a, b) => a.start - b.start);
 
+            // Gap Detection for Multi-Speaker
             let bestCandidates = candidates;
             
             for (let i = 0; i < candidates.length - 1; i++) {
@@ -157,7 +165,9 @@
                 const nextStart = candidates[i+1].start;
                 
                 if (nextStart - currentEnd > 0.5) {
+                    // Gap detected! 
                     const baseCenter = (startTime + (endTime || startTime + 5)) / 2;
+                    
                     bestCandidates = [candidates.reduce((best, curr) => {
                         const currCenter = (curr.start + (curr.end || curr.start + 2)) / 2;
                         const bestCenter = (best.start + (best.end || best.start + 2)) / 2;
@@ -167,6 +177,7 @@
                 }
             }
 
+            // 3. Merge texts
             const combinedText = bestCandidates.map(c => c.text).join(' ');
             const combinedPinyin = bestCandidates.map(c => c.pinyin || '').join(' ');
 
@@ -180,7 +191,7 @@
         // --- Components ---
 
         const HighlightText = React.memo(({ text, highlight }) => {
-            if (!text) return null;
+            if (!text) return null; // Safe return
             if (!highlight) return <span>{text}</span>;
             
             const strText = String(text); 
@@ -247,6 +258,7 @@
             const renderContent = (lang) => {
                 if (!visibleLangs[lang]) return null;
 
+                // Unified Highlight Style for Base Language (All colors behave like Korean)
                 const isBase = baseLang === lang;
                 const highlightClass = isBase && isActive 
                     ? 'font-bold text-blue-600 dark:text-blue-400' 
@@ -290,6 +302,7 @@
                         }`}
                 >
                     <div className="absolute top-2 right-2 flex items-center gap-1">
+                        {/* [MODIFIED] Auto-scroll Icon */}
                         {isActive && autoScroll && (
                             <Icon name="scroll" className="w-3 h-3 text-blue-500 animate-bounce" />
                         )}
@@ -474,13 +487,15 @@
                 return () => document.removeEventListener('mousedown', handleClickOutside);
             }, []);
 
+            // [NEW] Debounce Input (0.3초)
             useEffect(() => {
                 const handler = setTimeout(() => {
                     setDebouncedSearchQuery(searchQuery);
-                }, 300); 
+                }, 300); // 300ms debounce
                 return () => clearTimeout(handler);
             }, [searchQuery]);
 
+            // [NEW] Advanced Search Logic (Hit Count & Sort) with Debounce
             useEffect(() => {
                 const query = debouncedSearchQuery.trim().toLowerCase();
                 if (query === '') {
@@ -488,17 +503,21 @@
                     setShowSearchResults(false);
                     setExpandedSearch(false);
                 } else {
+                    // 1. Calculate Hits & Match Info
                     const resultsWithHits = allItems.map(item => {
                         let hits = 0;
                         let matchedScriptPreview = null;
                         let isMatch = false;
 
+                        // Title Match
                         if (searchScope === 'all' || searchScope === 'title') {
                              if (item.title && item.title.toLowerCase().includes(query)) {
                                  isMatch = true;
+                                 // Title match doesn't increment hit count (as per request for frequency display)
                              }
                         }
 
+                        // Script Match & Count
                         if (searchScope === 'all' || searchScope === 'script') {
                             if (item.scripts) {
                                 ['ko', 'en', 'cn'].forEach(lang => {
@@ -519,7 +538,10 @@
                         return { ...item, _hitCount: hits, _matchedPreview: matchedScriptPreview, _isMatch: isMatch };
                     });
 
+                    // 2. Filter
                     const filtered = resultsWithHits.filter(item => item._isMatch);
+
+                    // 3. Sort (Hits Descending, then Title length/accuracy if needed)
                     filtered.sort((a, b) => b._hitCount - a._hitCount);
 
                     setSearchResults(filtered);
@@ -776,7 +798,7 @@
                                 {/* [MODIFIED] Adjusted pl to 24 (6rem) for better spacing without icon, z-0 default */}
                                 <input 
                                     type="text" 
-                                    placeholder="🔍 영상 제목이나 내용을 검색하세요" 
+                                    placeholder="검색" 
                                     className="absolute inset-0 w-full h-full bg-transparent py-2 pl-24 pr-10 outline-none text-base text-slate-700 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 rounded-full" 
                                     value={searchQuery} 
                                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -984,7 +1006,7 @@
                                                 </button>
 
                                                 {showPlayerSettings && (
-                                                    <div className="absolute bottom-full right-0 mb-4 bg-lightpanel dark:bg-panel border border-slate-200 dark:border-zinc-700 rounded-xl shadow-2xl p-5 w-60 popup-enter z-50 max-w-[90vw]">
+                                                    <div className="absolute bottom-full right-0 mb-4 bg-lightpanel dark:bg-panel border border-slate-200 dark:border-zinc-700 rounded-xl shadow-2xl p-5 w-60 popup-enter z-50 max-w-[95vw]">
                                                         <div className="mb-5">
                                                             <div className="text-[11px] font-bold text-slate-500 dark:text-zinc-500 uppercase px-1 mb-2">배속</div>
                                                             <div className="grid grid-cols-4 gap-1.5">
@@ -1072,7 +1094,7 @@
                                         </div>
 
                                         {showRightSettings && (
-                                            <div className="bg-lightpanel dark:bg-panel rounded-xl p-4 border border-slate-200 dark:border-zinc-700 animate-in slide-in-from-top-2 fade-in mb-2 shadow-lg max-w-[95vw] w-full md:w-[60rem]">
+                                            <div className="bg-lightpanel dark:bg-panel rounded-xl p-4 border border-slate-200 dark:border-zinc-700 animate-in slide-in-from-top-2 fade-in mb-2 shadow-lg max-w-[95vw] w-full md:w-auto lg:w-[56rem]">
                                                 {/* Header */}
                                                 <div className="flex items-center justify-between mb-3 px-1 border-b border-slate-200 dark:border-zinc-700 pb-2">
                                                     <span className="text-[11px] font-bold text-slate-500 dark:text-zinc-500 uppercase flex items-center gap-1.5">
@@ -1088,9 +1110,28 @@
                                                     </button>
                                                 </div>
 
-                                                <div className="flex flex-col md:flex-row gap-4 h-full">
-                                                    {/* Column 1: Settings - Compact Width */}
-                                                    <div className="w-full md:w-[23rem] space-y-2 shrink-0"> 
+                                                <div className="flex flex-col lg:flex-row gap-4 h-full">
+                                                    {/* Column 1: Info Box (Left) - Fixed Width (40%) */}
+                                                    <div className="w-full lg:w-[38%] shrink-0 border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-zinc-700 pb-4 lg:pb-0 lg:pr-4 flex flex-col">
+                                                        <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20 rounded-lg p-4 flex gap-3 shadow-sm h-full"> 
+                                                            <div className="mt-0.5 bg-blue-100 dark:bg-blue-500/20 p-1.5 rounded-full text-blue-600 dark:text-blue-400 shrink-0 h-fit">
+                                                                <Icon name="info" className="w-4 h-4" />
+                                                            </div>
+                                                            <div className="text-[12px] leading-relaxed text-slate-600 dark:text-slate-300 break-keep">
+                                                                <p className="mb-3">
+                                                                    <span className="font-bold text-blue-600 dark:text-blue-400 block mb-1">기준 언어 설정:</span> 
+                                                                    선택한 언어의 타임라인에 맞춰 자막을 정렬합니다. 학습할 주 언어로 설정하세요.
+                                                                </p>
+                                                                <p>
+                                                                    <span className="font-bold text-blue-600 dark:text-blue-400 block mb-1">Tip:</span> 
+                                                                    좌측 상단 버튼으로 언제든 변경 가능합니다.
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Column 2: Settings (Right) - Flexible (60%) */}
+                                                    <div className="flex-1 min-w-0 space-y-2"> 
                                                         {langOrder.map((langId, idx) => (
                                                             <div key={langId} className="flex items-center justify-start bg-slate-100 dark:bg-zinc-800 rounded-lg p-2 gap-4 shadow-sm border border-transparent hover:border-slate-200 dark:hover:border-zinc-700 transition-colors">
                                                                 
@@ -1120,7 +1161,7 @@
                                                                 </div>
 
                                                                 {/* RIGHT: Visibility & Order - Pushed to right but compact */}
-                                                                <div className="flex items-center gap-3 shrink-0">
+                                                                <div className="flex items-center gap-3 shrink-0 ml-auto">
                                                                     {/* 3. Divider */}
                                                                     <div className="w-px h-4 bg-slate-300 dark:bg-zinc-600"></div>
 
@@ -1156,25 +1197,6 @@
                                                                 </div>
                                                             </div>
                                                         ))}
-                                                    </div>
-
-                                                    {/* Column 2: Info Box - Wider (Flex-1) */}
-                                                    <div className="flex-1 shrink-0 border-t md:border-t-0 md:border-l border-slate-200 dark:border-zinc-700 pt-4 md:pt-0 md:pl-4 flex flex-col">
-                                                        <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20 rounded-lg p-4 flex gap-3 shadow-sm h-full"> 
-                                                            <div className="mt-0.5 bg-blue-100 dark:bg-blue-500/20 p-1.5 rounded-full text-blue-600 dark:text-blue-400 shrink-0 h-fit">
-                                                                <Icon name="info" className="w-4 h-4" />
-                                                            </div>
-                                                            <div className="text-[12px] leading-relaxed text-slate-600 dark:text-slate-300 break-keep">
-                                                                <p className="mb-3">
-                                                                    <span className="font-bold text-blue-600 dark:text-blue-400 block mb-1">기준 언어 설정:</span> 
-                                                                    선택한 언어의 타임라인에 맞춰 자막을 정렬합니다. 학습할 주 언어로 설정하세요.
-                                                                </p>
-                                                                <p>
-                                                                    <span className="font-bold text-blue-600 dark:text-blue-400 block mb-1">Tip:</span> 
-                                                                    좌측 상단 버튼으로 언제든 변경 가능합니다.
-                                                                </p>
-                                                            </div>
-                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>

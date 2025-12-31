@@ -207,6 +207,8 @@
             if(name === 'moon') return <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>;
             // Headphone Icon for Audio
             if(name === 'headphone') return <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>;
+            // [NEW] Auto-scroll Icon
+            if(name === 'scroll') return <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 19-7-7"/><path d="m19 12-7 7"/><path d="M12 5v14"/></svg>;
 
             const icons = {
                 play: <path d="m5 3 14 9-14 9V3z" />,
@@ -283,14 +285,20 @@
                 <div 
                     onClick={() => onClick(item.start)}
                     ref={itemRef}
-                    className={`mb-2 px-3 py-3 rounded-lg cursor-pointer transition-all duration-200 relative group border-l-4
+                    className={`mb-2 px-3 py-3 rounded-lg cursor-pointer transition-all duration-200 relative group border-l-4 flex flex-col gap-3
                         ${isActive 
                             ? 'bg-green-100 dark:bg-zinc-800/80 border-blue-500' 
                             : 'hover:bg-green-50 dark:hover:bg-zinc-800/40 border-transparent'
                         }`}
                 >
-                    <div className="absolute top-2 right-2 text-[10px] md:text-xs font-mono text-slate-400 dark:text-zinc-500 group-hover:text-slate-600 dark:group-hover:text-zinc-400 transition-colors">
-                        {new Date(item.start * 1000).toISOString().substr(14, 5)}
+                    <div className="absolute top-2 right-2 flex items-center gap-1">
+                        {/* [MODIFIED] Auto-scroll Icon */}
+                        {isActive && autoScroll && (
+                            <Icon name="scroll" className="w-3 h-3 text-blue-500 animate-bounce" />
+                        )}
+                        <span className="text-[10px] md:text-xs font-mono text-slate-400 dark:text-zinc-500 group-hover:text-slate-600 dark:group-hover:text-zinc-400 transition-colors">
+                            {new Date(item.start * 1000).toISOString().substr(14, 5)}
+                        </span>
                     </div>
 
                     {langOrder.map(lang => renderContent(lang))}
@@ -392,7 +400,7 @@
             const [selectedText, setSelectedText] = useState('');
             const [selectionPos, setSelectionPos] = useState({ x: 0, y: 0 });
             
-            const [fontSizes, setFontSizes] = useState({ ko: 18, en: 16, cn: 20 });
+            const [fontSizes, setFontSizes] = useState({ ko: 18, en: 18, cn: 18 });
             const [showPinyin, setShowPinyin] = useState(true); // Always true, no toggle
             const [scriptSearchQuery, setScriptSearchQuery] = useState('');
 
@@ -407,7 +415,7 @@
             const scriptContainerRef = useRef(null); 
             const scopeMenuRef = useRef(null);
 
-            // Language Labels
+            // [MODIFIED] Language Labels (Korean)
             const langLabels = { ko: '한국어', en: '영어', cn: '중국어' };
             const speedOptions = [0.5, 0.75, 0.8, 0.9, 1.0, 1.2, 1.5];
 
@@ -825,12 +833,15 @@
                                             </div>
                                         )}
 
-                                        {/* Overlay Subtitles */}
+                                        {/* Overlay Subtitles: [MODIFIED] Fixed Font Size */}
                                         {!selectedItem.isExternal && !videoError && selectedItem.scripts && activeIndices.base !== -1 && (
                                             <div className="absolute bottom-6 left-0 right-0 px-4 text-center pointer-events-none flex flex-col items-center gap-2">
                                                 <div className="inline-block bg-black/70 backdrop-blur-md px-6 py-4 rounded-xl shadow-lg max-w-full">
                                                      {/* Base Lang */}
-                                                    <div className={`text-white font-semibold leading-relaxed drop-shadow-sm transition-all duration-300 ${baseLang === 'cn' ? 'font-chinese-serif text-2xl tracking-wide' : 'text-xl'}`}>
+                                                    <div 
+                                                        className={`text-white font-semibold leading-relaxed drop-shadow-sm transition-all duration-300 ${baseLang === 'cn' ? 'font-chinese-serif tracking-wide' : ''}`}
+                                                        style={{ fontSize: '16.5px' }} // Fixed size
+                                                    >
                                                         {selectedItem.scripts[baseLang]?.[activeIndices.base]?.text}
                                                     </div>
                                                     
@@ -848,12 +859,16 @@
                                                         if (!matched) return null;
 
                                                         return (
-                                                            <div key={mode} className={`text-zinc-200 text-lg mt-2 font-medium border-t border-white/10 pt-2 ${mode === 'cn' ? 'font-chinese-serif' : ''}`}>
+                                                            <div 
+                                                                key={mode} 
+                                                                className={`text-zinc-200 mt-2 font-medium border-t border-white/10 pt-2 flex flex-col-reverse items-center ${mode === 'cn' ? 'font-chinese-serif' : ''}`}
+                                                                style={{ fontSize: '16.5px' }} // Fixed size
+                                                            >
+                                                                    {matched.text}
                                                                     {/* Overlay Pinyin Support */}
                                                                     {mode === 'cn' && showPinyin && matched.pinyin && (
                                                                         <div className="text-sm text-blue-300 mb-1">{matched.pinyin}</div>
                                                                     )}
-                                                                    {matched.text}
                                                             </div>
                                                         );
                                                     })}
@@ -1019,7 +1034,7 @@
                                                 {/* Removed Pinyin Toggle (Always On) */}
                                                 
                                                 <div className="space-y-1 border-b border-slate-200 dark:border-zinc-700 pb-3 mb-3"> 
-                                                    {[{id:'ko', name:'KR'}, {id:'en', name:'EN'}, {id:'cn', name:'CN'}].map(lang => (
+                                                    {[{id:'ko', name:'한국어'}, {id:'en', name:'영어'}, {id:'cn', name:'중국어'}].map(lang => (
                                                         <div key={lang.id} className="flex items-center gap-2">
                                                             <span className="text-[10px] font-bold text-slate-500 dark:text-zinc-500 w-6">{lang.name}</span>
                                                             <input 
@@ -1042,7 +1057,7 @@
                                                     <div className="space-y-1">
                                                         {langOrder.map((langId, idx) => (
                                                             <div key={langId} className="flex items-center justify-between bg-slate-100 dark:bg-zinc-800 rounded px-2 py-1">
-                                                                <span className="text-xs font-bold text-slate-700 dark:text-zinc-300 uppercase">{langId}</span>
+                                                                <span className="text-xs font-bold text-slate-700 dark:text-zinc-300 uppercase">{langLabels[langId]}</span>
                                                                 <div className="flex items-center gap-1">
                                                                     <button onClick={() => toggleLangVisibility(langId)} className={`text-[9px] px-1.5 py-0.5 rounded ${visibleLangs[langId] ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400' : 'bg-slate-200 dark:bg-zinc-700 text-slate-500 dark:text-zinc-500'}`}>
                                                                         {visibleLangs[langId] ? 'On' : 'Off'}

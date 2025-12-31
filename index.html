@@ -41,13 +41,14 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@500;700&display=swap');
         
-        html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; background-color: #121212; color: #d4d4d8; } 
+        /* [MODIFIED] Dynamic Viewport Height for Mobile & Brighter Text */
+        html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; background-color: #121212; color: #e4e4e7; } 
         body { font-family: 'Inter', 'Noto Sans KR', sans-serif; -webkit-font-smoothing: antialiased; }
         
         .font-chinese-serif { font-family: 'Noto Serif SC', serif; }
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #1e1e1e; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #52525b; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #18181b; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #52525b; border-radius: 3px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #71717a; }
         
         .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -62,11 +63,14 @@
         @keyframes slide-up { from { transform: translate(-50%, 20px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
         .toast-enter { animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
-        mark.highlight { background-color: rgba(234, 179, 8, 0.5); color: white; border-radius: 2px; padding: 0 2px; font-weight: bold; }
+        mark.highlight { background-color: rgba(234, 179, 8, 0.6); color: white; border-radius: 2px; padding: 0 2px; font-weight: bold; }
+        
+        /* Mobile Touch Improvements */
+        .touch-action-manipulation { touch-action: manipulation; }
     </style>
 </head>
-<body class="bg-darkbg text-zinc-300">
-    <div id="root" class="h-full flex flex-col"></div>
+<body class="bg-darkbg text-zinc-200">
+    <div id="root" class="h-[100dvh] flex flex-col"></div>
 
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo, useCallback } = React;
@@ -83,6 +87,7 @@
             while (left <= right) {
                 const mid = Math.floor((left + right) / 2);
                 const item = script[mid];
+                // Conservative endTime guess for search
                 const endTime = item.end || (script[mid+1] ? script[mid+1].start : item.start + 10);
 
                 if (time >= item.start && time < endTime) {
@@ -99,58 +104,56 @@
             return result;
         };
 
-        // [MODIFIED] Robust Logic: Merge Significant Overlaps (No Omission)
+        // [MODIFIED] Robust Logic: Strict End Time & Smart Merge
+        // This ensures subtitles disappear during silence and don't grab irrelevant next lines.
         const getMatchingContent = (targetScript, startTime, endTime) => {
             if (!targetScript || targetScript.length === 0) return null;
             
-            const safeEndTime = endTime || (startTime + 5);
+            // [CRITICAL] Use strict endTime if provided, don't blindly add 5s
+            const strictEndTime = endTime ? endTime : (startTime + 5);
             
-            // 1. Find ALL candidates that overlap the time window
+            // 1. Find candidates strictly within window
             const candidates = targetScript.filter(t => {
                 const tEnd = t.end || (t.start + 5); 
-                return (t.start < safeEndTime) && (tEnd > startTime);
+                // Strict overlap check: Must overlap significantly
+                return (t.start < strictEndTime - 0.1) && (tEnd > startTime + 0.1);
             });
 
-            if (candidates.length === 0) {
-                // Fallback: Nearest start time
+            // 2. Filter out noise (very short overlaps relative to clip duration)
+            const meaningfulCandidates = candidates.filter(c => {
+                const cEnd = c.end || (c.start + 5);
+                const overlapStart = Math.max(startTime, c.start);
+                const overlapEnd = Math.min(strictEndTime, cEnd);
+                const overlapDuration = Math.max(0, overlapEnd - overlapStart);
+                
+                // Keep if overlap is > 0.2s OR covers > 50% of the target sentence
+                // This ensures short sentences (ex: "No!") are kept even if overlap is small
+                const sentenceDuration = cEnd - c.start;
+                return overlapDuration > 0.2 || (overlapDuration / sentenceDuration) > 0.5;
+            });
+
+            if (meaningfulCandidates.length === 0) {
+                // Fallback only if we are VERY close (e.g. slight timing offset)
                 const idx = findIndexByTime(targetScript, startTime);
                 if (idx !== -1) {
                     const candidate = targetScript[idx];
-                    if (Math.abs(candidate.start - startTime) < 2.0) {
+                    if (Math.abs(candidate.start - startTime) < 0.5) {
                          return { ...candidate, isFallback: true };
                     }
                 }
                 return null;
             }
 
-            // 2. Filter out "noise" (insignificant overlaps)
-            // But KEEP multiple sentences if they all overlap significantly (e.g. > 0.2s)
-            // This ensures we don't omit consecutive short sentences.
-            const meaningfulCandidates = candidates.filter(c => {
-                const cEnd = c.end || (c.start + 5);
-                const overlapStart = Math.max(startTime, c.start);
-                const overlapEnd = Math.min(safeEndTime, cEnd);
-                const overlapDuration = Math.max(0, overlapEnd - overlapStart);
-                
-                // Threshold: Keep if overlap is > 0.2s. 
-                // This filters out timing glitches where previous sentence ends 0.01s into current window.
-                return overlapDuration > 0.2; 
-            });
+            // 3. Sort & Merge (Combine all meaningful candidates to avoid omission)
+            meaningfulCandidates.sort((a, b) => a.start - b.start);
 
-            // If strict filtering removed everything, fall back to all candidates (safety net)
-            const finalCandidates = meaningfulCandidates.length > 0 ? meaningfulCandidates : candidates;
-
-            // 3. Sort by start time to maintain reading order
-            finalCandidates.sort((a, b) => a.start - b.start);
-
-            // 4. Combine text (Merge Strategy)
-            const combinedText = finalCandidates.map(c => c.text).join(' ');
-            const combinedPinyin = finalCandidates.map(c => c.pinyin || '').join(' ');
+            const combinedText = meaningfulCandidates.map(c => c.text).join(' ');
+            const combinedPinyin = meaningfulCandidates.map(c => c.pinyin || '').join(' ');
 
             return { 
                 text: combinedText, 
                 pinyin: combinedPinyin.trim() ? combinedPinyin : null,
-                start: finalCandidates[0].start 
+                start: meaningfulCandidates[0].start 
             };
         };
 
@@ -180,8 +183,8 @@
                 play: <path d="m5 3 14 9-14 9V3z" />,
                 pause: <path d="M6 4h4v16H6zm8 0h4v16h-4z" />,
                 search: <React.Fragment><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></React.Fragment>,
-                // [MODIFIED] Fixed Settings Icon (Solid Gear)
-                settings: <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.04.17 0 .34.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.58 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.04-.22 0-.45-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" />,
+                // [MODIFIED] Standard Filled Gear Icon (Material Design) for Settings
+                settings: <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.58,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z" />,
                 x: <path d="M18 6 6 18M6 6l12 12"/>,
                 volume: <path d="M11 5L6 9H2v6h4l5 4V5z" />,
                 message: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />,
@@ -216,26 +219,26 @@
                 <div 
                     onClick={() => onClick(item.start)}
                     ref={itemRef}
-                    className={`mb-3 px-4 py-3 rounded-lg cursor-pointer transition-all duration-200 relative group border-l-4
+                    className={`mb-2 px-3 py-3 rounded-lg cursor-pointer transition-all duration-200 relative group border-l-4
                         ${isActive 
                             ? 'bg-zinc-800/80 border-blue-500' 
                             : 'hover:bg-zinc-800/40 border-transparent'
                         }`}
                 >
-                    <div className="absolute top-3 right-3 text-[9px] font-mono text-zinc-500 group-hover:text-zinc-400 transition-colors">
+                    <div className="absolute top-2 right-2 text-[9px] font-mono text-zinc-500 group-hover:text-zinc-400 transition-colors">
                         {new Date(item.start * 1000).toISOString().substr(14, 5)}
                     </div>
 
                     {koContent && (
-                        <div style={{ fontSize: `${fontSizes.ko}px` }} className={`leading-relaxed mb-1.5 transition-colors cursor-text ${baseLang==='ko' && isActive ? 'font-bold text-blue-300' : 'text-zinc-300 group-hover:text-white'}`}>
+                        <div style={{ fontSize: `${fontSizes.ko}px` }} className={`leading-relaxed mb-1 transition-colors cursor-text select-text ${baseLang==='ko' && isActive ? 'font-bold text-blue-400' : 'text-zinc-300 group-hover:text-white'}`}>
                             <HighlightText text={koContent.text} highlight={searchQuery} />
                         </div>
                     )}
 
                     {cnContent && (
-                        <div className={`leading-relaxed mb-1.5 cursor-text ${baseLang==='cn' && isActive ? 'font-bold text-zinc-200' : 'text-zinc-400 group-hover:text-zinc-300'}`}>
+                        <div className={`leading-relaxed mb-1 cursor-text select-text ${baseLang==='cn' && isActive ? 'font-bold text-zinc-200' : 'text-zinc-400 group-hover:text-zinc-300'}`}>
                             {showPinyin && cnContent.pinyin && (
-                                <div style={{ fontSize: `${fontSizes.cn * 0.75}px` }} className="text-blue-400/80 mb-0.5 font-light">{cnContent.pinyin}</div>
+                                <div style={{ fontSize: `${Math.max(10, fontSizes.cn * 0.7)}px` }} className="text-blue-400/80 mb-0.5 font-light">{cnContent.pinyin}</div>
                             )}
                             <div style={{ fontSize: `${fontSizes.cn}px` }} className="font-chinese-serif">
                                 <HighlightText text={cnContent.text} highlight={searchQuery} />
@@ -244,7 +247,7 @@
                     )}
 
                     {enContent && (
-                        <div style={{ fontSize: `${fontSizes.en}px` }} className={`italic leading-snug cursor-text ${baseLang==='en' && isActive ? 'font-bold text-zinc-200' : 'text-zinc-400 group-hover:text-zinc-300'}`}>
+                        <div style={{ fontSize: `${fontSizes.en}px` }} className={`italic leading-snug cursor-text select-text ${baseLang==='en' && isActive ? 'font-bold text-zinc-200' : 'text-zinc-400 group-hover:text-zinc-300'}`}>
                             <HighlightText text={enContent.text} highlight={searchQuery} />
                         </div>
                     )}
@@ -270,7 +273,7 @@
             if (itemsToRender.length === 0) return <div className="p-10 text-center text-zinc-500 text-sm">검색 결과가 없습니다.</div>;
 
             return (
-                <div className="flex-1 overflow-y-auto p-2 custom-scrollbar bg-darkbg">
+                <div className="flex-1 overflow-y-auto p-2 custom-scrollbar bg-darkbg select-text">
                     {itemsToRender.map((item, idx) => {
                         const originalIdx = scripts[baseLang].indexOf(item); 
                         const isActive = activeIndex === originalIdx;
@@ -343,7 +346,8 @@
 
             const [selectedText, setSelectedText] = useState('');
             const [selectionPos, setSelectionPos] = useState({ x: 0, y: 0 });
-            const [fontSizes, setFontSizes] = useState({ ko: 16, en: 15, cn: 18 });
+            // [MODIFIED] Increased Default Font Size to 18
+            const [fontSizes, setFontSizes] = useState({ ko: 18, en: 16, cn: 20 });
             const [showPinyin, setShowPinyin] = useState(true);
             const [scriptSearchQuery, setScriptSearchQuery] = useState('');
 
@@ -391,7 +395,6 @@
 
             useEffect(() => { loadData(); }, []);
 
-            // Close scope menu when clicking outside
             useEffect(() => {
                 const handleClickOutside = (event) => {
                     if (scopeMenuRef.current && !scopeMenuRef.current.contains(event.target)) {
@@ -524,11 +527,25 @@
                 }
             }, [audioLang, selectedItem]);
 
+            // [MODIFIED] Gap Handling Logic (Active Indices)
             const activeIndices = useMemo(() => {
                 if (!selectedItem || selectedItem.isExternal || !selectedItem.scripts) return { base: -1 };
                 const baseScript = selectedItem.scripts[baseLang];
                 if (!baseScript || baseScript.length === 0) return { base: -1 };
+                
                 const baseIdx = findIndexByTime(baseScript, currentTime);
+                
+                // [NEW] Silence Detection: If outside item duration, return -1
+                if (baseIdx !== -1) {
+                    const item = baseScript[baseIdx];
+                    const nextItem = baseScript[baseIdx + 1];
+                    const endTime = item.end || (nextItem ? nextItem.start : item.start + 10);
+                    // Buffer 0.3s allows for slight drift but hides subtitle in long gaps
+                    if (currentTime > endTime + 0.3) {
+                        return { base: -1 }; 
+                    }
+                }
+                
                 return { base: baseIdx };
             }, [currentTime, selectedItem, baseLang]);
 
@@ -593,22 +610,22 @@
 
             return (
                 <div className="flex flex-col h-full overflow-hidden select-none bg-darkbg">
-                    {/* Header: Larger Search & Centered */}
+                    {/* Header */}
                     <header className="h-16 flex items-center justify-between px-4 shrink-0 border-b border-zinc-800 bg-darkbg/90 backdrop-blur-md z-30 gap-4">
                         <div className="flex items-center gap-2 cursor-pointer shrink-0" onClick={() => { setSelectedItem(null); setIsPlaying(false); }}>
                             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-lg">J</div>
                             <span className="font-bold text-base tracking-tight hidden sm:block text-zinc-200">Language Player</span>
                         </div>
                         
+                        {/* [MODIFIED] Mobile-Friendly Search Bar */}
                         <form onSubmit={handleSearchSubmit} className="flex-1 max-w-2xl mx-auto relative group">
-                            <div className="relative flex items-center bg-panel rounded-full border border-zinc-600 focus-within:border-blue-500 transition-colors h-11 shadow-lg">
+                            <div className="relative flex items-center bg-panel rounded-full border border-zinc-600 focus-within:border-blue-500 transition-colors h-11 shadow-lg w-full">
                                 
-                                {/* Custom Search Scope Dropdown */}
                                 <div className="relative" ref={scopeMenuRef}>
                                     <button 
                                         type="button" 
                                         onClick={() => setShowScopeMenu(!showScopeMenu)}
-                                        className="flex items-center gap-1.5 px-3 h-full text-xs font-bold text-zinc-300 hover:text-white transition-colors"
+                                        className="flex items-center gap-1.5 px-3 h-full text-xs font-bold text-zinc-300 hover:text-white transition-colors whitespace-nowrap"
                                     >
                                         <span>
                                             {searchScope === 'all' ? '전체' : 
@@ -619,11 +636,7 @@
                                     
                                     {showScopeMenu && (
                                         <div className="absolute top-full left-0 mt-2 w-24 bg-panel border border-zinc-700 rounded-lg shadow-xl py-1 z-50 animate-slide-down overflow-hidden">
-                                            {[
-                                                { id: 'all', label: '전체' },
-                                                { id: 'title', label: '제목' },
-                                                { id: 'script', label: '자막' }
-                                            ].map(opt => (
+                                            {[ { id: 'all', label: '전체' }, { id: 'title', label: '제목' }, { id: 'script', label: '자막' } ].map(opt => (
                                                 <button
                                                     key={opt.id}
                                                     type="button"
@@ -642,8 +655,8 @@
                                 <Icon name="search" className="w-5 h-5 text-zinc-400 ml-2" />
                                 <input 
                                     type="text" 
-                                    placeholder="검색..." 
-                                    className="flex-1 bg-transparent py-2 px-3 outline-none text-base text-zinc-200 placeholder-zinc-500" 
+                                    placeholder="검색" 
+                                    className="flex-1 bg-transparent py-2 px-3 outline-none text-base text-zinc-200 placeholder-zinc-500 min-w-0" 
                                     value={searchQuery} 
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     onFocus={() => { if(searchQuery) setShowSearchResults(true); }}
@@ -655,9 +668,9 @@
                                 )}
                             </div>
                             
-                            {/* Search Results */}
+                            {/* Search Results (Mobile: limit height) */}
                             {showSearchResults && searchResults.length > 0 && (
-                                <div className="absolute top-full left-0 right-0 mt-2 bg-panel rounded-xl shadow-2xl border border-zinc-700 max-h-[70vh] overflow-y-auto custom-scrollbar z-50 p-2">
+                                <div className="absolute top-full left-0 right-0 mt-2 bg-panel rounded-xl shadow-2xl border border-zinc-700 max-h-[60vh] overflow-y-auto custom-scrollbar z-50 p-2 max-w-[95vw] mx-auto">
                                     {(expandedSearch ? searchResults : searchResults.slice(0, 5)).map(item => (
                                         <button key={item.natural_key} type="button" onClick={() => selectVideo(item)} className="w-full text-left px-4 py-3 hover:bg-zinc-700 rounded-lg group transition-colors flex items-center justify-between border-b border-zinc-700/50 last:border-0">
                                             <div className="flex-1 min-w-0 pr-3">
@@ -681,12 +694,12 @@
                             )}
                         </form>
                         
-                        <div className="w-8 shrink-0"></div> 
+                        <div className="w-0 sm:w-8 shrink-0"></div> 
                     </header>
 
-                    {/* [MODIFIED] Mobile Layout: Fixed Height Video, Scrolling Script */}
+                    {/* [MODIFIED] Mobile Layout */}
                     <main className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
-                        {/* LEFT (Desktop) / TOP (Mobile): Video Player (Fixed Height on Mobile) */}
+                        {/* Video Player */}
                         <div className="w-full h-[35vh] flex-none md:w-[40%] md:h-full flex flex-col min-w-0 bg-black relative group border-b md:border-b-0 md:border-r border-zinc-800">
                             {!selectedItem ? (
                                 <div className="flex-1 flex flex-col items-center justify-center bg-panel text-zinc-500 gap-4">
@@ -721,8 +734,8 @@
                                             </div>
                                         )}
 
-                                        {/* Overlay Subtitles */}
-                                        {!selectedItem.isExternal && !videoError && selectedItem.scripts && (
+                                        {/* Overlay Subtitles: Hide if activeIndices.base is -1 */}
+                                        {!selectedItem.isExternal && !videoError && selectedItem.scripts && activeIndices.base !== -1 && (
                                             <div className="absolute bottom-6 left-0 right-0 px-4 text-center pointer-events-none flex flex-col items-center gap-2">
                                                 <div className="inline-block bg-black/70 backdrop-blur-md px-6 py-4 rounded-xl shadow-lg max-w-full">
                                                      {/* Base Lang */}
@@ -730,7 +743,7 @@
                                                         {selectedItem.scripts[baseLang]?.[activeIndices.base]?.text}
                                                     </div>
                                                     
-                                                    {/* Using Improved Merge Logic */}
+                                                    {/* Other Langs */}
                                                     {Array.from(subtitleModes).map(mode => {
                                                         if (mode === baseLang) return null; 
                                                         
@@ -811,8 +824,9 @@
                                                     <Icon name="settings" className="w-5 h-5" />
                                                 </button>
 
+                                                {/* [MODIFIED] Mobile-Friendly Settings Popup */}
                                                 {showPlayerSettings && (
-                                                    <div className="absolute bottom-full right-0 mb-4 bg-panel border border-zinc-700 rounded-xl shadow-2xl p-5 w-60 popup-enter z-50">
+                                                    <div className="absolute bottom-full right-0 mb-4 bg-panel border border-zinc-700 rounded-xl shadow-2xl p-5 w-60 popup-enter z-50 max-w-[90vw]">
                                                         <div className="mb-5">
                                                             <div className="text-[11px] font-bold text-zinc-500 uppercase px-1 mb-2">배속</div>
                                                             <div className="grid grid-cols-4 gap-1.5">
@@ -857,7 +871,7 @@
                             )}
                         </div>
 
-                        {/* RIGHT (Desktop) / BOTTOM (Mobile): Script Panel (Scrolling) */}
+                        {/* Script Panel */}
                         <div className="w-full flex-1 md:w-[60%] md:h-full border-l-0 md:border-l border-zinc-800 bg-darkbg flex flex-col shadow-xl z-20 shrink-0 min-h-0">
                             {/* Script Header */}
                             <div className="p-4 border-b border-zinc-800 bg-darkbg/95 backdrop-blur-sm space-y-3 shrink-0">
@@ -887,7 +901,7 @@
                                                     onClick={() => setAutoScroll(!autoScroll)}
                                                     className={`px-3 py-1.5 rounded-md text-[11px] font-bold border transition-colors ${autoScroll ? 'border-blue-500/50 text-blue-400 bg-blue-500/10' : 'border-zinc-700 text-zinc-500'}`}
                                                 >
-                                                    {autoScroll ? '자동 스크롤 On' : '자동 스크롤 Off'}
+                                                    {autoScroll ? 'On' : 'Off'}
                                                 </button>
                                                 <button onClick={() => setShowRightSettings(!showRightSettings)} className={`p-2 rounded-lg transition-colors ${showRightSettings ? 'bg-zinc-800 text-blue-400' : 'text-zinc-500 hover:text-zinc-300'}`}>
                                                     <Icon name="settings" className="w-4 h-4" />
@@ -896,13 +910,13 @@
                                         </div>
 
                                         {showRightSettings && (
-                                            <div className="bg-panel rounded-xl p-4 border border-zinc-700 animate-in slide-in-from-top-2 fade-in mb-2 shadow-lg">
+                                            <div className="bg-panel rounded-xl p-4 border border-zinc-700 animate-in slide-in-from-top-2 fade-in mb-2 shadow-lg max-w-[90vw]">
                                                 <div className="flex items-center justify-between mb-3">
                                                     <span className="text-xs font-bold text-zinc-400">병음 표시</span>
                                                     <button onClick={() => setShowPinyin(!showPinyin)} className={`text-[11px] font-bold px-3 py-1 rounded border transition-colors ${showPinyin ? 'bg-blue-600 border-blue-600 text-white' : 'border-zinc-600 text-zinc-400'}`}>{showPinyin ? '켜짐' : '꺼짐'}</button>
                                                 </div>
                                                 
-                                                {/* [MODIFIED] Compact Font Settings */}
+                                                {/* Compact Font Settings */}
                                                 <div className="space-y-1"> 
                                                     {[{id:'ko', name:'KR'}, {id:'en', name:'EN'}, {id:'cn', name:'CN'}].map(lang => (
                                                         <div key={lang.id} className="flex items-center gap-2">
@@ -939,7 +953,7 @@
                                 )}
                             </div>
 
-                            {/* Script List: Added select-text for Dragging */}
+                            {/* Script List */}
                             {selectedItem && !selectedItem.isExternal && selectedItem.scripts && (
                                 <div 
                                     className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-darkbg select-text" 
@@ -951,7 +965,11 @@
                                             const range = selection.getRangeAt(0);
                                             const rect = range.getBoundingClientRect();
                                             setSelectedText(text);
-                                            setSelectionPos({ x: rect.left + rect.width / 2, y: rect.top });
+                                            // [MODIFIED] Bounded position for tooltips
+                                            setSelectionPos({ 
+                                                x: Math.min(Math.max(rect.left + rect.width / 2, 20), window.innerWidth - 20), 
+                                                y: rect.top 
+                                            });
                                         } else {
                                             setSelectedText('');
                                         }
@@ -972,16 +990,17 @@
                         </div>
                     </main>
 
-                    {/* Dictionary Tooltip */}
+                    {/* [MODIFIED] Dictionary Tooltip with Daum */}
                     {selectedText && (
                         <div 
                             className="fixed z-50 bg-zinc-800 shadow-2xl rounded-xl p-2 flex gap-2 border border-zinc-700 animate-in zoom-in-95 duration-200" 
-                            style={{ left: Math.min(window.innerWidth - 180, selectionPos.x), top: selectionPos.y - 60 }}
+                            style={{ left: Math.min(window.innerWidth - 240, Math.max(10, selectionPos.x - 100)), top: selectionPos.y - 60 }}
                             onMouseUp={(e) => e.stopPropagation()} 
                             onMouseDown={(e) => e.stopPropagation()}
                         >
-                            <a href={`https://dict.naver.com/search.nhn?query=${encodeURIComponent(selectedText)}`} target="_blank" onClick={(e) => e.stopPropagation()} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm">네이버</a>
-                            <a href={`https://translate.google.com/?sl=auto&tl=ko&text=${encodeURIComponent(selectedText)}`} target="_blank" onClick={(e) => e.stopPropagation()} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm">구글</a>
+                            <a href={`https://dict.naver.com/search.nhn?query=${encodeURIComponent(selectedText)}`} target="_blank" onClick={(e) => e.stopPropagation()} className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm">네이버</a>
+                            <a href={`https://dic.daum.net/search.do?q=${encodeURIComponent(selectedText)}`} target="_blank" onClick={(e) => e.stopPropagation()} className="px-3 py-2 bg-yellow-500 hover:bg-yellow-600 text-black text-xs font-bold rounded-lg transition-colors shadow-sm">다음</a>
+                            <a href={`https://translate.google.com/?sl=auto&tl=ko&text=${encodeURIComponent(selectedText)}`} target="_blank" onClick={(e) => e.stopPropagation()} className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm">구글</a>
                         </div>
                     )}
                 </div>

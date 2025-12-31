@@ -1136,15 +1136,15 @@
                             onMouseUp={(e) => e.stopPropagation()} 
                             onMouseDown={(e) => e.stopPropagation()}
                         >
-                            <a href={`https://dict.naver.com/search.nhn?query=${encodeURIComponent(selectedText)}`} target="_blank" onClick={(e) => e.stopPropagation()} className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm">네이버</a>
-                            <a href={`https://dic.daum.net/search.do?q=${encodeURIComponent(selectedText)}`} target="_blank" onClick={(e) => e.stopPropagation()} className="px-3 py-2 bg-yellow-500 hover:bg-yellow-600 text-black text-xs font-bold rounded-lg transition-colors shadow-sm">다음</a>
-                            <a href={`https://translate.google.com/?sl=auto&tl=ko&text=${encodeURIComponent(selectedText)}`} target="_blank" onClick={(e) => e.stopPropagation()} className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm">구글</a>
+                            <a href={`https://dict.naver.com/search.nhn?query=${encodeURIComponent(selectedText)}`} target="_blank" onClick={(e) => e.stopPropagation()} className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm">네이버사전</a>
+                            <a href={`https://dic.daum.net/search.do?q=${encodeURIComponent(selectedText)}`} target="_blank" onClick={(e) => e.stopPropagation()} className="px-3 py-2 bg-yellow-500 hover:bg-yellow-600 text-black text-xs font-bold rounded-lg transition-colors shadow-sm">다음사전</a>
+                            <a href={`https://translate.google.com/?sl=auto&tl=ko&text=${encodeURIComponent(selectedText)}`} target="_blank" onClick={(e) => e.stopPropagation()} className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm">번역기</a>
                         </div>
                     )}
 
                     {/* Footer */}
                     <footer className="p-4 text-center text-slate-500 dark:text-zinc-500 text-[10px] md:text-xs border-t border-slate-200 dark:border-zinc-800 bg-lightbg dark:bg-darkbg shrink-0 safe-pb">
-                        문의하기: <a href="mailto:maybenewmail@gmail.com" className="hover:text-slate-700 dark:hover:text-zinc-300 underline">maybenewmail@gmail.com</a>
+                        📧 문의하기: <a href="mailto:mifaressel25@gmail.com" className="hover:text-slate-700 dark:hover:text-zinc-300 underline">mifaressel25@gmail.com</a>
                     </footer>
                 </div>
             );
